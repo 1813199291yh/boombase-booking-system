@@ -83,10 +83,11 @@ const App: React.FC = () => {
     navigateTo(ScreenType.WAIVER);
   };
 
-  const finalizeBooking = async () => {
+  const finalizeBooking = async (waiverDetails?: { waiverName: string, waiverSignature: string }) => {
     try {
       const { booking } = await api.createBooking({
         ...currentBookingDraft,
+        ...waiverDetails,
         status: 'Pending Approval', // API default is Pending Payment, but logic can vary
         waiverSigned: true,
       });

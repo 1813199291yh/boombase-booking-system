@@ -1,12 +1,24 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 
 interface WaiverPageProps {
-  onContinue: () => void;
+  onContinue: (data: { waiverName: string, waiverSignature: string }) => void;
   onCancel: () => void;
 }
 
 const WaiverPage: React.FC<WaiverPageProps> = ({ onContinue, onCancel }) => {
+  const [fullName, setFullName] = useState('');
+  const [signature, setSignature] = useState('');
+
+  const handleContinue = () => {
+    if (!fullName || !signature) {
+      alert("Please sign the waiver to continue");
+      return;
+    }
+    // Pass data back if needed, or just proceed knowing it's signed
+    onContinue({ waiverName: fullName, waiverSignature: signature });
+  };
+
   return (
     <div className="bg-[#f8f7f5] dark:bg-[#23180f] min-h-screen font-manrope">
       <header className="flex items-center justify-between border-b border-[#ead9cd] dark:border-[#3d2b1d] px-6 md:px-20 py-4 bg-white dark:bg-[#1a130e]">
@@ -45,26 +57,37 @@ const WaiverPage: React.FC<WaiverPageProps> = ({ onContinue, onCancel }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="flex flex-col gap-2">
               <label className="text-sm font-bold uppercase">Full Name</label>
-              <input className="w-full rounded-lg border border-[#ead9cd] dark:border-[#3d2b1d] px-4 py-3 bg-white dark:bg-[#2d1f14]" defaultValue="Damon Yuan" readOnly />
+              <input
+                className="w-full rounded-lg border border-[#ead9cd] dark:border-[#3d2b1d] px-4 py-3 bg-white dark:bg-[#2d1f14] outline-none focus:ring-2 focus:ring-primary/50"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Type your full name"
+              />
             </div>
             <div className="flex flex-col gap-2">
               <label className="text-sm font-bold uppercase">Date</label>
-              <input className="w-full rounded-lg border border-[#ead9cd] dark:border-[#3d2b1d] px-4 py-3 bg-white dark:bg-[#2d1f14]" defaultValue="October 24, 2024" readOnly />
+              <input className="w-full rounded-lg border border-[#ead9cd] dark:border-[#3d2b1d] px-4 py-3 bg-white dark:bg-[#2d1f14]" defaultValue={new Date().toLocaleDateString()} readOnly />
             </div>
           </div>
 
           <div className="flex flex-col gap-2">
             <label className="text-sm font-bold uppercase">Digital Signature</label>
-            <div className="h-48 border-2 border-dashed border-[#ead9cd] dark:border-[#3d2b1d] rounded-xl flex items-center justify-center signature-grid bg-white dark:bg-[#1a120b]">
-              <div className="flex flex-col items-center gap-2 text-neutral-400">
-                <span className="material-symbols-outlined text-4xl">gesture</span>
-                <p>Sign here using mouse or touch</p>
+            <div className="relative">
+              <input
+                className="w-full rounded-xl border-2 border-dashed border-[#ead9cd] dark:border-[#3d2b1d] px-6 py-6 bg-white dark:bg-[#1a120b] font-handwriting text-2xl outline-none focus:border-primary transition-colors"
+                value={signature}
+                onChange={(e) => setSignature(e.target.value)}
+                placeholder="Type your signature here..."
+              />
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none uppercase text-xs font-bold tracking-widest">
+                Signed
               </div>
             </div>
+            <p className="text-xs text-slate-400">By typing your name above, you acknowledge that this constitutes your electronic signature and agreement to the terms.</p>
           </div>
 
           <div className="flex flex-col md:flex-row gap-4 pt-4 pb-12">
-            <button onClick={onContinue} className="flex-1 bg-primary hover:bg-orange-600 text-white font-bold py-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2">
+            <button onClick={handleContinue} className="flex-1 bg-primary hover:bg-orange-600 text-white font-bold py-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2">
               Continue to Booking <span className="material-symbols-outlined">arrow_forward</span>
             </button>
             <button onClick={onCancel} className="px-8 py-4 border border-[#ead9cd] dark:border-[#3d2b1d] font-bold rounded-xl">Cancel</button>

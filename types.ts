@@ -23,5 +23,7 @@ export interface Booking {
   status: 'Pending Approval' | 'Confirmed' | 'Declined' | 'Refunded';
   price: number;
   waiverSigned: boolean;
+  waiverName?: string;
+  waiverSignature?: string;
   timestamp: number;
 }

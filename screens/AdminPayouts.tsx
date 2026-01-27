@@ -16,26 +16,49 @@ const AdminPayouts: React.FC<AdminPayoutsProps> = ({ onNavigateToDashboard, onNa
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [payouts, setPayouts] = useState<any[]>([]);
 
+  const [bookings, setBookings] = useState<any[]>([]);
+
   React.useEffect(() => {
-    loadPayouts();
+    loadData();
   }, []);
 
-  const loadPayouts = async () => {
+  const loadData = async () => {
     try {
-      const data = await api.getPayouts();
-      setPayouts(data);
+      const [payoutsData, bookingsData] = await Promise.all([
+        api.getPayouts(),
+        api.getBookings()
+      ]);
+      setPayouts(payoutsData);
+      setBookings(bookingsData);
     } catch (e) {
       console.error(e);
     }
   };
 
-  const availableBalance = 1540.00; // Ideally fetch from API too
-  const pendingProcessing = 600.00; // Ideally fetch from API too
+  // Calculate stats
+  const totalRevenue = bookings
+    .filter((b: any) => b.status === 'Confirmed')
+    .reduce((sum: number, b: any) => sum + b.price, 0);
+
+  const totalPayoutsst = payouts
+    .filter((p: any) => p.status !== 'Failed') // Count all non-failed payouts against balance
+    .reduce((sum: number, p: any) => sum + p.amount, 0);
+
+  const pendingProcessing = payouts
+    .filter((p: any) => p.status === 'Processing')
+    .reduce((sum: number, p: any) => sum + p.amount, 0);
+
+  const availableBalance = totalRevenue - totalPayoutsst;
 
   const handleRequestPayout = async () => {
+    if (availableBalance <= 0) {
+      alert("No funds available for withdrawal.");
+      return;
+    }
+
     try {
-      await api.requestPayout(availableBalance); // Request full balance
-      await loadPayouts();
+      await api.requestPayout(availableBalance);
+      await loadData();
       setShowRequestModal(false);
       alert("Payout requested successfully!");
     } catch (e) {

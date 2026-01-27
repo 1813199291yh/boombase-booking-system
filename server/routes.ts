@@ -37,7 +37,7 @@ router.post('/login', (req, res) => {
 // Create a booking & Payment Intent
 router.post('/bookings', async (req, res) => {
     try {
-        const { customerName, email, courtType, date, time, price } = req.body;
+        const { customerName, email, courtType, date, time, price, waiverName, waiverSignature } = req.body;
 
         // 1. Create a PaymentIntent with Stripe
         const paymentIntent = await stripe.paymentIntents.create({
@@ -59,7 +59,10 @@ router.post('/bookings', async (req, res) => {
                     time,
                     price,
                     status: 'Pending Payment',
-                    stripe_payment_id: paymentIntent.id
+                    stripe_payment_id: paymentIntent.id,
+                    waiver_signed: true,
+                    waiver_name: waiverName,
+                    waiver_signature: waiverSignature
                 }
             ])
             .select()

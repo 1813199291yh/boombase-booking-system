@@ -12,7 +12,9 @@ create table public.bookings (
   price numeric,
   status text default 'Pending Payment',
   stripe_payment_id text,
-  waiver_signed boolean default false
+  waiver_signed boolean default false,
+  waiver_name text,
+  waiver_signature text
 );
 
 -- Create Payouts Table

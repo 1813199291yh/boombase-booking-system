@@ -1,5 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { api } from '../src/api';
+import { CourtType } from '../types';
 
 interface AdminScheduleProps {
   onNavigateToDashboard: () => void;
@@ -11,10 +13,23 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
   const [selectedWeek, setSelectedWeek] = useState('Oct 21 – 27, 2024');
   const [showBlockModal, setShowBlockModal] = useState(false);
   const [recurrence, setRecurrence] = useState<'One-Time' | 'Weekly' | 'Monthly'>('One-Time');
-  const [blockedSlots, setBlockedSlots] = useState<{ day: number, hourIdx: number, reason: string }[]>([
-    { day: 0, hourIdx: 0, reason: 'Morning Maintenance' },
-    { day: 0, hourIdx: 1, reason: 'Morning Maintenance' }
-  ]);
+  const [blockScope, setBlockScope] = useState<CourtType>('Full Court');
+
+  // Store full booking objects now, not just indices
+  const [bookings, setBookings] = useState<any[]>([]);
+
+  useEffect(() => {
+    loadSchedule();
+  }, []);
+
+  const loadSchedule = async () => {
+    try {
+      const data = await api.getBookings();
+      setBookings(data);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const generateTimeSlots = () => {
     const slots = [];
@@ -31,12 +46,60 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
   const hours = generateTimeSlots();
   const days = ['MON 21', 'TUE 22', 'WED 23', 'THU 24', 'FRI 25', 'SAT 26', 'SUN 27'];
 
-  const handleBlockSlot = (dayIdx: number, hourIdx: number) => {
-    const isBlocked = blockedSlots.find(s => s.day === dayIdx && s.hourIdx === hourIdx);
-    if (isBlocked) {
-      setBlockedSlots(blockedSlots.filter(s => !(s.day === dayIdx && s.hourIdx === hourIdx)));
+  // Helper to map grid index to DateTime
+  const getSlotDateTime = (dayIdx: number, slotIdx: number) => {
+    // Very simple mock date logic for demo 'Oct 21' start
+    const startDay = 21;
+    const day = startDay + dayIdx;
+    const dateStr = `2024-10-${day}`; // Fixed month for demo
+
+    const hour = 8 + Math.floor(slotIdx / 2);
+    const min = (slotIdx % 2) === 0 ? '00' : '30';
+
+    let displayHour = hour > 12 ? hour - 12 : hour;
+    let period = hour >= 12 ? "PM" : "AM";
+    const timeStr = `${displayHour.toString().padStart(2, '0')}:${min} ${period}`;
+
+    return { date: dateStr, time: timeStr };
+  };
+
+  const handleBlockSlot = async (dayIdx: number, hourIdx: number) => {
+    const { date, time } = getSlotDateTime(dayIdx, hourIdx);
+    const existing = bookings.find(b => b.date === date && b.time === time);
+
+    if (existing) {
+      // If it's a manual block (Declined status in our logic), unblock?
+      // Or if it's a real booking, maybe explicit Cancel?
+      // For simplicity: if it's 'Declined' (Block), remove it.
+      // If it's Confirmed, warn user.
+      if (existing.status === 'Confirmed') {
+        alert("This slot is booked by a customer. Please reject/cancel it from the Dashboard first.");
+        return;
+      }
+      if (existing.status === 'Declined') {
+        // In a real app we would DELETE. 
+        // Currently no DELETE endpoint in `api`.
+        // We'll just alert for now or implement DELETE later.
+        alert("Unblocking not fully implemented in API yet.");
+      }
     } else {
-      setBlockedSlots([...blockedSlots, { day: dayIdx, hourIdx: hourIdx, reason: 'Facility Block' }]);
+      // Create Block
+      try {
+        await api.createBooking({
+          customerName: 'Facility Block',
+          email: 'admin@internal',
+          courtType: blockScope,
+          date: date,
+          time: time,
+          status: 'Declined', // Using 'Declined' as 'Block'
+          price: 0,
+          waiverSigned: true
+        } as any);
+        await loadSchedule();
+      } catch (e) {
+        console.error(e);
+        alert("Failed to block slot");
+      }
     }
   };
 
@@ -140,22 +203,46 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
                 <div key={hIdx} className="grid grid-cols-[100px_repeat(7,1fr)] h-12 border-b border-border-dark/50">
                   <div className="flex items-center justify-center text-[9px] font-black text-slate-500 uppercase tracking-widest border-r border-border-dark">{hour}</div>
                   {days.map((_, dIdx) => {
-                    const isBlocked = blockedSlots.find(s => s.day === dIdx && s.hourIdx === hIdx);
+                    const { date, time } = getSlotDateTime(dIdx, hIdx);
+                    // Find a booking/block for this slot
+                    const booking = bookings.find(b => b.date === date && b.time === time);
+
+                    const isOccupied = booking && (booking.status === 'Confirmed' || booking.status === 'Declined' || booking.status === 'Pending Approval');
+                    const isConfirmed = booking?.status === 'Confirmed';
+                    const isManualBlock = booking?.customerName === 'Facility Block' || booking?.status === 'Declined';
+                    const isPending = booking?.status === 'Pending Approval';
+
+                    const isFullCourt = booking?.courtType === 'Full Court';
+
+                    // Visuals
+                    let bgClass = 'hover:bg-primary/5';
+                    let borderClass = 'border-l border-border-dark';
+                    let textClass = 'text-slate-500';
+                    let borderColor = '';
+
+                    if (isOccupied) {
+                      if (isFullCourt) {
+                        bgClass = isConfirmed ? 'bg-green-500/20' : isPending ? 'bg-orange-500/20' : 'bg-red-500/20';
+                        textClass = isConfirmed ? 'text-green-600' : isPending ? 'text-orange-500' : 'text-red-500';
+                        borderColor = isConfirmed ? 'border-green-500/30' : isPending ? 'border-orange-500/30' : 'border-red-500/30';
+                      } else {
+                        bgClass = isConfirmed ? 'bg-blue-500/20' : isPending ? 'bg-blue-300/20' : 'bg-blue-500/10';
+                        textClass = 'text-blue-500';
+                        borderColor = 'border-blue-500/30';
+                      }
+                    }
+
                     return (
                       <div
                         key={dIdx}
                         onClick={() => handleBlockSlot(dIdx, hIdx)}
-                        className={`border-l border-border-dark relative group transition-all cursor-crosshair overflow-hidden ${isBlocked ? 'bg-slate-100 dark:bg-slate-900/50' : 'hover:bg-primary/5'}`}
+                        className={`${borderClass} relative group transition-all cursor-pointer overflow-hidden ${bgClass}`}
                       >
-                        {isBlocked && (
-                          <div className="absolute inset-1 border border-dashed border-slate-400/20 rounded flex items-center justify-center opacity-60">
-                            <span className="text-[7px] font-black uppercase tracking-widest">{isBlocked.reason}</span>
-                          </div>
-                        )}
-
-                        {hIdx === 2 && dIdx === 3 && !isBlocked && (
-                          <div className="absolute inset-x-1 top-1 bottom-1 bg-primary rounded p-2 z-20 border border-white/10">
-                            <p className="text-white font-black text-[9px] uppercase italic leading-none">Training</p>
+                        {isOccupied && (
+                          <div className={`absolute inset-1 border border-dashed rounded flex items-center justify-center opacity-90 ${borderColor} ${textClass}`}>
+                            <span className="text-[7px] font-black uppercase tracking-widest text-center leading-tight">
+                              {isManualBlock ? 'BLOCKED' : isPending ? 'PENDING' : booking.courtType}
+                            </span>
                           </div>
                         )}
                       </div>
