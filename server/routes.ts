@@ -38,17 +38,28 @@ router.post('/login', (req, res) => {
 // Create a booking & Payment Intent
 router.post('/bookings', async (req, res) => {
     try {
-        const { customerName, email, courtType, date, time, price, waiverName, waiverSignature } = req.body;
+        const { customerName, email, courtType, date, time, price, waiverName, waiverSignature, status } = req.body;
 
-        // 1. Create a PaymentIntent with Stripe
-        const paymentIntent = await stripe.paymentIntents.create({
-            amount: Math.round(price * 100), // cents
-            currency: 'usd',
-            metadata: { customerName, email, courtType, date, time },
-            automatic_payment_methods: { enabled: true },
-        });
+        let stripePaymentId = 'manual-block';
+        let bookingStatus = 'Pending Approval';
+        let clientSecret = null;
 
-        // 2. Save booking to Supabase (Initial status: Pending Payment)
+        // 1. Create a PaymentIntent with Stripe (ONLY if price > 0)
+        if (price > 0) {
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount: Math.round(price * 100), // cents
+                currency: 'usd',
+                metadata: { customerName, email, courtType, date, time },
+                automatic_payment_methods: { enabled: true },
+            });
+            stripePaymentId = paymentIntent.id;
+            clientSecret = paymentIntent.client_secret;
+        } else {
+            // Allow status override for Admin Blocks (price 0)
+            if (status) bookingStatus = status;
+        }
+
+        // 2. Save booking to Supabase
         const { data, error } = await supabase
             .from('bookings')
             .insert([
@@ -59,8 +70,8 @@ router.post('/bookings', async (req, res) => {
                     date,
                     time,
                     price,
-                    status: 'Pending Approval',
-                    stripe_payment_id: paymentIntent.id,
+                    status: bookingStatus,
+                    stripe_payment_id: stripePaymentId,
                     waiver_signed: true,
                     waiver_name: waiverName,
                     waiver_signature: waiverSignature
@@ -71,15 +82,15 @@ router.post('/bookings', async (req, res) => {
 
         if (error) {
             console.error('Supabase error:', error);
-            // Ensure we don't leave a hanging payment intent if DB fails? 
-            // For MVP, just return error
             return res.status(500).json({ error: error.message });
         }
 
-        // Send Email to Admin
-        await sendAdminNotification(data);
+        // Send Email to Admin (only if it's a real customer booking, i.e. price > 0 or not blocked)
+        if (price > 0) {
+            await sendAdminNotification(data);
+        }
 
-        res.json({ clientSecret: paymentIntent.client_secret, booking: data });
+        res.json({ clientSecret, booking: data });
     } catch (error: any) {
         console.error('Error creating booking:', error);
         res.status(500).json({ error: error.message });
