@@ -83,21 +83,16 @@ const App: React.FC = () => {
     navigateTo(ScreenType.WAIVER);
   };
 
-  const finalizeBooking = async (waiverDetails?: { waiverName: string, waiverSignature: string }) => {
+  const finalizeBooking = async (confirmedBooking: Booking) => {
+    // PaymentModal already created the booking and confirmed payment.
+    // We just refresh data and show confirmation.
     try {
-      const { booking } = await api.createBooking({
-        ...currentBookingDraft,
-        ...waiverDetails,
-        status: 'Pending Approval', // API default is Pending Payment, but logic can vary
-        waiverSigned: true,
-      });
-
       // Refresh bookings
       await loadBookings();
       navigateTo(ScreenType.CONFIRMATION);
     } catch (e) {
-      console.error("Booking failed", e);
-      alert("Booking failed to ensure. Please try again.");
+      console.error("Post-booking refresh failed", e);
+      navigateTo(ScreenType.CONFIRMATION);
     }
   };
 
@@ -123,7 +118,11 @@ const App: React.FC = () => {
           onBack={() => navigateTo(ScreenType.LANDING)}
         />;
       case ScreenType.WAIVER:
-        return <WaiverPage onContinue={finalizeBooking} onCancel={() => navigateTo(ScreenType.CHECKOUT)} />;
+        return <WaiverPage
+          booking={currentBookingDraft}
+          onContinue={finalizeBooking}
+          onCancel={() => navigateTo(ScreenType.CHECKOUT)}
+        />;
       case ScreenType.CONFIRMATION:
         return <ConfirmationPage onGoHome={() => navigateTo(ScreenType.LANDING)} />;
       case ScreenType.ADMIN_DASHBOARD:

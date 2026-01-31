@@ -1,22 +1,30 @@
-
 import React, { useState } from 'react';
+import PaymentModal from '../components/PaymentModal';
+import { Booking } from '../types';
 
 interface WaiverPageProps {
-  onContinue: (data: { waiverName: string, waiverSignature: string }) => void;
+  booking: Partial<Booking>;
+  onContinue: (booking: Booking) => void;
   onCancel: () => void;
 }
 
-const WaiverPage: React.FC<WaiverPageProps> = ({ onContinue, onCancel }) => {
+const WaiverPage: React.FC<WaiverPageProps> = ({ booking, onContinue, onCancel }) => {
   const [fullName, setFullName] = useState('');
   const [signature, setSignature] = useState('');
+
+  const [showPayment, setShowPayment] = useState(false);
 
   const handleContinue = () => {
     if (!fullName || !signature) {
       alert("Please sign the waiver to continue");
       return;
     }
-    // Pass data back if needed, or just proceed knowing it's signed
-    onContinue({ waiverName: fullName, waiverSignature: signature });
+    setShowPayment(true);
+  };
+
+  const handlePaymentSuccess = (confirmedBooking: Booking) => {
+    setShowPayment(false);
+    onContinue(confirmedBooking);
   };
 
   return (
@@ -88,12 +96,26 @@ const WaiverPage: React.FC<WaiverPageProps> = ({ onContinue, onCancel }) => {
 
           <div className="flex flex-col md:flex-row gap-4 pt-4 pb-12">
             <button onClick={handleContinue} className="flex-1 bg-primary hover:bg-orange-600 text-white font-bold py-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2">
-              Continue to Booking <span className="material-symbols-outlined">arrow_forward</span>
+              Confirm & Pay <span className="material-symbols-outlined">credit_card</span>
             </button>
             <button onClick={onCancel} className="px-8 py-4 border border-[#ead9cd] dark:border-[#3d2b1d] font-bold rounded-xl">Cancel</button>
           </div>
         </div>
       </main>
+
+      {showPayment && (
+        <PaymentModal
+          bookingData={{
+            ...booking,
+            waiverName: fullName,
+            waiverSignature: signature,
+            waiverSigned: true,
+            status: 'Pending Approval', // Default status for Stripe-created bookings
+          }}
+          onSuccess={handlePaymentSuccess}
+          onCancel={() => setShowPayment(false)}
+        />
+      )}
     </div>
   );
 };

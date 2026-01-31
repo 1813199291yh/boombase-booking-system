@@ -23,11 +23,11 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ booking, onConfirm, onBack 
     <div className="bg-background-dark text-white min-h-screen font-space">
       <header className="flex items-center justify-between px-10 py-4 border-b border-border-dark sticky top-0 z-50 bg-background-dark/80 backdrop-blur-md">
         <div className="flex items-center gap-3 cursor-pointer" onClick={onBack}>
-           <span className="material-symbols-outlined text-primary">arrow_back</span>
-           <h1 className="text-xl font-black uppercase tracking-tighter">Boombase</h1>
+          <span className="material-symbols-outlined text-primary">arrow_back</span>
+          <h1 className="text-xl font-black uppercase tracking-tighter">Boombase</h1>
         </div>
         <div className="hidden md:block">
-           <p className="text-xs uppercase font-bold tracking-widest text-slate-500">Secure Checkout System</p>
+          <p className="text-xs uppercase font-bold tracking-widest text-slate-500">Secure Checkout System</p>
         </div>
       </header>
 
@@ -54,66 +54,45 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ booking, onConfirm, onBack 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-bold uppercase tracking-widest text-neutral-400">Full Name</label>
-                  <input 
+                  <input
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full bg-card-dark border-border-dark rounded-lg h-14 px-4 text-white focus:ring-1 focus:ring-primary outline-none" 
-                    placeholder="Enter your name" 
+                    className="w-full bg-card-dark border-border-dark rounded-lg h-14 px-4 text-white focus:ring-1 focus:ring-primary outline-none"
+                    placeholder="Enter your name"
                   />
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-bold uppercase tracking-widest text-neutral-400">Email Address</label>
-                  <input 
+                  <input
                     required
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-card-dark border-border-dark rounded-lg h-14 px-4 text-white focus:ring-1 focus:ring-primary outline-none" 
-                    placeholder="name@email.com" 
+                    className="w-full bg-card-dark border-border-dark rounded-lg h-14 px-4 text-white focus:ring-1 focus:ring-primary outline-none"
+                    placeholder="name@email.com"
                   />
                 </div>
               </div>
             </section>
 
-            <section>
-              <div className="flex items-center gap-2 mb-6 border-b border-border-dark pb-3">
-                <span className="material-symbols-outlined text-primary">credit_card</span>
-                <h2 className="text-2xl font-black uppercase tracking-tight">Payment Detail</h2>
-              </div>
-              <div className="bg-card-dark p-6 rounded-xl border border-border-dark flex flex-col gap-5">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-bold text-slate-500 uppercase">Authorized Secure Payment</p>
-                  <div className="flex gap-2">
-                    <div className="w-8 h-5 bg-slate-800 rounded"></div>
-                    <div className="w-8 h-5 bg-slate-800 rounded"></div>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <input required className="w-full bg-background-dark border-border-dark rounded-lg h-14 px-4 text-white" placeholder="0000 0000 0000 0000" />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <input required className="w-full bg-background-dark border-border-dark rounded-lg h-14 px-4 text-white" placeholder="MM / YY" />
-                  <input required className="w-full bg-background-dark border-border-dark rounded-lg h-14 px-4 text-white" placeholder="CVV" />
-                </div>
-              </div>
-            </section>
+
           </div>
 
           <div className="lg:col-span-5">
             <div className="sticky top-28 bg-card-dark border border-border-dark rounded-xl overflow-hidden shadow-2xl">
               <div className="p-6 border-b border-border-dark bg-[#1a1a1a]">
-                 <h3 className="text-lg font-black uppercase tracking-tighter">Reservation Summary</h3>
+                <h3 className="text-lg font-black uppercase tracking-tighter">Reservation Summary</h3>
               </div>
               <div className="p-6 space-y-6">
                 <div className="flex items-start gap-4">
-                   <div className="size-16 rounded bg-primary/20 flex items-center justify-center text-primary">
-                      <span className="material-symbols-outlined text-3xl">sports_basketball</span>
-                   </div>
-                   <div>
-                      <p className="text-xs font-bold text-primary uppercase">Court Selection</p>
-                      <p className="text-lg font-black uppercase">{booking.courtType}</p>
-                   </div>
+                  <div className="size-16 rounded bg-primary/20 flex items-center justify-center text-primary">
+                    <span className="material-symbols-outlined text-3xl">sports_basketball</span>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-primary uppercase">Court Selection</p>
+                    <p className="text-lg font-black uppercase">{booking.courtType}</p>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 text-sm font-bold uppercase">
@@ -142,7 +121,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ booking, onConfirm, onBack 
                   </div>
                 </div>
                 <button type="submit" className="w-full bg-primary hover:bg-orange-500 h-16 rounded-lg text-white font-black uppercase tracking-widest text-lg transition-all flex items-center justify-center gap-2 shadow-xl shadow-primary/10">
-                  Pay & Next <span className="material-symbols-outlined">chevron_right</span>
+                  Proceed to Waiver <span className="material-symbols-outlined">chevron_right</span>
                 </button>
                 <p className="text-[10px] text-center text-slate-500 font-bold uppercase tracking-widest">Waiver signature required next</p>
               </div>
