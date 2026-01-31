@@ -2,7 +2,7 @@
 import { Router } from 'express';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
-import { sendAdminNotification, sendClientConfirmation } from './email.js';
+import { sendAdminNotification, sendClientConfirmation, sendClientCancellation } from './email.js';
 
 export const router = Router();
 
@@ -119,6 +119,8 @@ router.post('/bookings/:id/status', async (req, res) => {
         // If status changed to Confirmed, send email to client
         if (status === 'Confirmed') {
             await sendClientConfirmation(data);
+        } else if (status === 'Cancelled') {
+            await sendClientCancellation(data);
         }
 
         res.json(data);

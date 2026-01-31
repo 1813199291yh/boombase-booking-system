@@ -66,3 +66,26 @@ export const sendClientConfirmation = async (booking: any) => {
         console.error('Error sending client email:', error);
     }
 };
+
+export const sendClientCancellation = async (booking: any) => {
+    const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: booking.email,
+        subject: `Booking Update - Boombase`,
+        html: `
+      <h2>Booking Cancelled</h2>
+      <p>Hi ${booking.customer_name},</p>
+      <p>Your booking scheduled for <strong>${booking.date} at ${booking.time}</strong> has been cancelled by the administrator.</p>
+      <p>If you have any questions, please contact us directly.</p>
+      <br/>
+      <p>Best,<br/>The Boombase Team</p>
+    `,
+    };
+
+    try {
+        await transporter.sendMail(mailOptions);
+        console.log('Client cancellation email sent');
+    } catch (error) {
+        console.error('Error sending client cancellation email:', error);
+    }
+};

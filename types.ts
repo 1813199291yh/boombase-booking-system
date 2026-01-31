@@ -20,7 +20,7 @@ export interface Booking {
   courtType: CourtType;
   date: string;
   time: string;
-  status: 'Pending Approval' | 'Confirmed' | 'Declined' | 'Refunded';
+  status: 'Pending Approval' | 'Confirmed' | 'Declined' | 'Refunded' | 'Cancelled';
   price: number;
   waiverSigned: boolean;
   waiverName?: string;
