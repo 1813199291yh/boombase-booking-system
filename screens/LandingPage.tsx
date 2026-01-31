@@ -55,7 +55,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ onBookNow, onAdminClick }) =>
 
           // Filter by Court (Full blocks Half, Half blocks Full?? For now strict match or Block logic)
           // If Full Court is booked, Half Court is also unavailable.
-          if (b.courtType === 'Full Court' || b.courtType === selectedCourt) {
+          // Conflict Logic:
+          // 1. Existing Full Court blocks EVERYTHING.
+          // 2. User selecting Full Court is blocked by EVERYTHING (Half or Full).
+          // 3. Exact match (Half blocks Half).
+          const isConflict = b.courtType === 'Full Court' || selectedCourt === 'Full Court' || b.courtType === selectedCourt;
+
+          if (isConflict) {
             // Parse Time Range
             if (b.time.includes('-')) {
               const [start, end] = b.time.split(' - ');
