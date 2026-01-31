@@ -6,15 +6,19 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:server": "tsc -p tsconfig.server.json",
+    "start": "node dist/server/index.js",
     "preview": "vite preview",
     "server": "ts-node -r dotenv/config server/index.ts",
     "dev:server": "nodemon --watch server --exec ts-node -r dotenv/config server/index.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.91.0",
+    "@types/nodemailer": "^7.0.9",
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "nodemailer": "^7.0.12",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "stripe": "^20.2.0"

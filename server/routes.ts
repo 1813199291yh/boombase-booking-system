@@ -2,6 +2,7 @@
 import { Router } from 'express';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
+import { sendAdminNotification, sendClientConfirmation } from './email.js';
 
 export const router = Router();
 
@@ -58,7 +59,7 @@ router.post('/bookings', async (req, res) => {
                     date,
                     time,
                     price,
-                    status: 'Pending Payment',
+                    status: 'Pending Approval',
                     stripe_payment_id: paymentIntent.id,
                     waiver_signed: true,
                     waiver_name: waiverName,
@@ -74,6 +75,9 @@ router.post('/bookings', async (req, res) => {
             // For MVP, just return error
             return res.status(500).json({ error: error.message });
         }
+
+        // Send Email to Admin
+        await sendAdminNotification(data);
 
         res.json({ clientSecret: paymentIntent.client_secret, booking: data });
     } catch (error: any) {
@@ -111,7 +115,50 @@ router.post('/bookings/:id/status', async (req, res) => {
             .single();
 
         if (error) throw error;
+
+        // If status changed to Confirmed, send email to client
+        if (status === 'Confirmed') {
+            await sendClientConfirmation(data);
+        }
+
         res.json(data);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Settings Routes
+router.get('/settings', async (req, res) => {
+    try {
+        const { data, error } = await supabase.from('settings').select('*');
+        if (error) throw error;
+
+        // Convert array to object { key: value }
+        const settings = data.reduce((acc: any, curr: any) => {
+            acc[curr.key] = curr.value;
+            return acc;
+        }, {});
+
+        res.json(settings);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+router.post('/settings/update', async (req, res) => {
+    try {
+        const updates = req.body; // Expect { key: value, key2: value2 }
+
+        // Process each update
+        const promises = Object.entries(updates).map(([key, value]) => {
+            return supabase
+                .from('settings')
+                .upsert({ key, value: String(value) })
+                .select();
+        });
+
+        await Promise.all(promises);
+        res.json({ success: true });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }

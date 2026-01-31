@@ -18,20 +18,49 @@ const AdminPayouts: React.FC<AdminPayoutsProps> = ({ onNavigateToDashboard, onNa
 
   const [bookings, setBookings] = useState<any[]>([]);
 
+  const [isEditingBank, setIsEditingBank] = useState(false);
+  const [bankInfo, setBankInfo] = useState({
+    bankName: 'Chase Business Checking',
+    accountLast4: '9210'
+  });
+
   React.useEffect(() => {
     loadData();
   }, []);
 
   const loadData = async () => {
     try {
-      const [payoutsData, bookingsData] = await Promise.all([
+      const [payoutsData, bookingsData, settingsData] = await Promise.all([
         api.getPayouts(),
-        api.getBookings()
+        api.getBookings(),
+        api.getSettings() // Fetch settings
       ]);
       setPayouts(payoutsData);
       setBookings(bookingsData);
+
+      // Update state if settings exist
+      if (settingsData && (settingsData.bank_name || settingsData.account_last4)) {
+        setBankInfo({
+          bankName: settingsData.bank_name || 'Chase Business Checking',
+          accountLast4: settingsData.account_last4 || '9210'
+        });
+      }
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const handleSaveBankInfo = async () => {
+    try {
+      await api.updateSettings({
+        bank_name: bankInfo.bankName,
+        account_last4: bankInfo.accountLast4
+      });
+      setIsEditingBank(false);
+      // Optional: Show success toast
+    } catch (e) {
+      console.error('Failed to save bank info', e);
+      alert('Failed to save bank info');
     }
   };
 
@@ -205,19 +234,49 @@ const AdminPayouts: React.FC<AdminPayoutsProps> = ({ onNavigateToDashboard, onNa
               </div>
 
               <div className="bg-background-dark p-6 rounded-2xl border border-border-dark">
-                <div className="flex justify-between items-center mb-4">
-                  <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest">To Account</span>
-                  <span className="text-primary text-[10px] font-black uppercase cursor-pointer hover:underline">Change</span>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="size-12 rounded bg-white/5 flex items-center justify-center text-white">
-                    <span className="material-symbols-outlined text-2xl">account_balance</span>
+                {!isEditingBank ? (
+                  <>
+                    <div className="flex justify-between items-center mb-4">
+                      <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest">To Account</span>
+                      <span onClick={() => setIsEditingBank(true)} className="text-primary text-[10px] font-black uppercase cursor-pointer hover:underline">Change</span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="size-12 rounded bg-white/5 flex items-center justify-center text-white">
+                        <span className="material-symbols-outlined text-2xl">account_balance</span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-white uppercase tracking-tight">{bankInfo.bankName}</p>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase">Ending in ••••{bankInfo.accountLast4}</p>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h4 className="text-white font-bold text-sm">Update Bank Info</h4>
+                      <span onClick={() => setIsEditingBank(false)} className="material-symbols-outlined text-gray-500 cursor-pointer text-sm">close</span>
+                    </div>
+                    <input
+                      value={bankInfo.bankName}
+                      onChange={(e) => setBankInfo({ ...bankInfo, bankName: e.target.value })}
+                      placeholder="Bank Name"
+                      className="w-full bg-black/20 border border-white/10 rounded px-3 py-2 text-white text-sm"
+                    />
+                    <input
+                      value={bankInfo.accountLast4}
+                      onChange={(e) => setBankInfo({ ...bankInfo, accountLast4: e.target.value })}
+                      placeholder="Last 4 Digits"
+                      maxLength={4}
+                      className="w-full bg-black/20 border border-white/10 rounded px-3 py-2 text-white text-sm"
+                    />
+                    <button
+                      onClick={handleSaveBankInfo}
+                      className="w-full bg-white/10 hover:bg-white/20 text-white py-2 rounded text-xs font-bold uppercase"
+                    >
+                      Save Details
+                    </button>
                   </div>
-                  <div>
-                    <p className="text-sm font-bold text-white uppercase tracking-tight">Chase Business Checking</p>
-                    <p className="text-[10px] font-bold text-slate-500 uppercase">Ending in ••••9210</p>
-                  </div>
-                </div>
+                )}
               </div>
 
               <div className="bg-primary/10 border border-primary/20 p-4 rounded-xl flex gap-3 text-primary">

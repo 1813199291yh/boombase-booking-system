@@ -1,7 +1,7 @@
 
 import { Booking } from '../types';
 
-const API_URL = 'http://localhost:3000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 export const api = {
     // Auth
@@ -56,6 +56,24 @@ export const api = {
             body: JSON.stringify({ amount }),
         });
         if (!response.ok) throw new Error('Failed to request payout');
+        return response.json();
+    },
+
+    // Settings
+    getSettings: async () => {
+        const response = await fetch(`${API_URL}/settings`);
+        if (response.ok) return response.json();
+        // Fallback if table doesn't exist yet
+        return {};
+    },
+
+    updateSettings: async (updates: any) => {
+        const response = await fetch(`${API_URL}/settings/update`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updates),
+        });
+        if (!response.ok) throw new Error('Failed to update settings');
         return response.json();
     },
 };
