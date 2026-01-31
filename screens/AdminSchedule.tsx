@@ -80,7 +80,12 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
   const getSlotDateTime = (dayIdx: number, slotIdx: number) => {
     const d = new Date(currentWeekStart);
     d.setDate(d.getDate() + dayIdx);
-    const dateStr = d.toISOString().split('T')[0];
+
+    // Use Local Time for string, not UTC
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
 
     const hour = 8 + Math.floor(slotIdx / 2);
     const min = (slotIdx % 2) === 0 ? '00' : '30';
@@ -100,18 +105,11 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
     const existing = bookings.find(b => b.date === date && b.time === time);
 
     if (existing) {
-      // If it's a manual block (Declined status in our logic), unblock?
-      // Or if it's a real booking, maybe explicit Cancel?
-      // For simplicity: if it's 'Declined' (Block), remove it.
-      // If it's Confirmed, warn user.
       if (existing.status === 'Confirmed') {
         alert("This slot is booked by a customer. Please reject/cancel it from the Dashboard first.");
         return;
       }
       if (existing.status === 'Declined') {
-        // In a real app we would DELETE. 
-        // Currently no DELETE endpoint in `api`.
-        // We'll just alert for now or implement DELETE later.
         alert("Unblocking not fully implemented in API yet.");
       }
     } else {

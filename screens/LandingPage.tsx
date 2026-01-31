@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { CourtType } from '../types';
 import { api } from '../src/api';
+import AppCalendar from '../components/AppCalendar';
 
 interface LandingPageProps {
   onBookNow: (court: CourtType, price: number, time: string, duration: number) => void;
@@ -14,7 +15,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onBookNow, onAdminClick }) =>
   const [duration, setDuration] = useState<number>(1);
   const [occupiedSlots, setOccupiedSlots] = useState<Set<string>>(new Set());
 
-  const today = new Date().toISOString().split('T')[0];
+  // Use local date for 'today'
+  const todayDate = new Date();
+  const today = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;
   const [selectedDate, setSelectedDate] = useState<string>(today);
 
   // Generate 30-minute intervals
@@ -182,13 +185,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ onBookNow, onAdminClick }) =>
             <div className="lg:col-span-1 space-y-8">
               <div>
                 <label className="text-xs font-black uppercase tracking-widest text-primary mb-3 block">1. Date</label>
-                <input
-                  type="date"
-                  min={today}
-                  value={selectedDate}
-                  onChange={(e) => { setSelectedDate(e.target.value); setStartTime(null); }}
-                  className="w-full bg-card-dark border-border-dark rounded-xl h-14 px-4 text-white font-bold focus:ring-2 focus:ring-primary outline-none transition-all"
-                />
+                <div className="flex justify-center md:justify-start">
+                  <AppCalendar
+                    selectedDate={selectedDate}
+                    onDateSelect={(d) => { setSelectedDate(d); setStartTime(null); }}
+                    minDate={today}
+                  />
+                </div>
               </div>
 
               <div>
