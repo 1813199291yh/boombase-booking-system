@@ -12,9 +12,9 @@ interface AdminScheduleProps {
 const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, onNavigateToPayouts, onExit }) => {
   const [selectedWeek, setSelectedWeek] = useState('Oct 21 – 27, 2024');
   const [showBlockModal, setShowBlockModal] = useState(false);
-  const [recurrence, setRecurrence] = useState<'One-Time' | 'Weekly' | 'Monthly' | 'Infinite'>('One-Time');
+  const [recurrence, setRecurrence] = useState<'Does not repeat' | 'Daily' | 'Weekly' | 'Monthly' | 'Every weekday (Mon-Fri)' | 'Infinite'>('Does not repeat');
   const [blockScope, setBlockScope] = useState<CourtType>('Full Court');
-  const [blockLabel, setBlockLabel] = useState('Facility Block');
+  const [blockLabel, setBlockLabel] = useState(''); // Default empty for "Add title" placeholder behavior
 
   // Edit Block Modal State
   const [editingBlock, setEditingBlock] = useState<any>(null);
@@ -211,7 +211,9 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
 
     // Determine number of repeats per slot
     let repeats = 1;
-    if (recurrence === 'Weekly') repeats = 12; // 3 months approx
+    if (recurrence === 'Daily') repeats = 365; // 1 year of daily
+    if (recurrence === 'Every weekday (Mon-Fri)') repeats = 260; // 1 year of weekdays approx
+    if (recurrence === 'Weekly') repeats = 52; // 1 year
     if (recurrence === 'Monthly') repeats = 12; // 1 year
     if (recurrence === 'Infinite') repeats = 156; // 3 years (52 * 3)
 
@@ -225,31 +227,51 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
         const [slotDate, slotTime] = slotKey.split('|');
         const baseDate = new Date(slotDate + 'T00:00:00');
 
-        for (let i = 0; i < repeats; i++) {
-          let targetDate = new Date(baseDate);
+        // Efficient Loop for all types
+        // We use a date cursor and count successful blocks
+        let currentDate = new Date(baseDate);
+        let count = 0;
 
-          if (recurrence === 'Weekly' || recurrence === 'Infinite') {
-            targetDate.setDate(baseDate.getDate() + (i * 7));
-          } else if (recurrence === 'Monthly') {
-            targetDate.setMonth(baseDate.getMonth() + i);
+        while (count < repeats) {
+          // 1. Check if current date is valid for this recurrence
+          let isValid = true;
+          if (recurrence === 'Every weekday (Mon-Fri)') {
+            const day = currentDate.getDay();
+            if (day === 0 || day === 6) isValid = false;
           }
 
-          const y = targetDate.getFullYear();
-          const m = String(targetDate.getMonth() + 1).padStart(2, '0');
-          const d = String(targetDate.getDate()).padStart(2, '0');
-          const dateStr = `${y}-${m}-${d}`;
+          // 2. If valid, add to batch
+          if (isValid) {
+            const y = currentDate.getFullYear();
+            const m = String(currentDate.getMonth() + 1).padStart(2, '0');
+            const d = String(currentDate.getDate()).padStart(2, '0');
+            const dateStr = `${y}-${m}-${d}`;
 
-          bookingsBatch.push({
-            customerName: blockName,
-            email: 'admin@internal',
-            courtType: blockScope,
-            date: dateStr,
-            time: slotTime,
-            status: 'Declined',
-            price: 0,
-            waiverSigned: true,
-            recurringGroupId: (recurrence !== 'One-Time') ? groupId : undefined
-          });
+            bookingsBatch.push({
+              customerName: blockName || 'Closed',
+              email: 'admin@internal',
+              courtType: blockScope,
+              date: dateStr,
+              time: slotTime,
+              status: 'Declined',
+              price: 0,
+              waiverSigned: true,
+              recurringGroupId: (recurrence !== 'Does not repeat') ? groupId : undefined
+            });
+
+            count++;
+          }
+
+          // 3. Advance Date Cursor
+          if (recurrence === 'Does not repeat') break;
+
+          if (recurrence === 'Daily' || recurrence === 'Every weekday (Mon-Fri)') {
+            currentDate.setDate(currentDate.getDate() + 1);
+          } else if (recurrence === 'Weekly' || recurrence === 'Infinite') {
+            currentDate.setDate(currentDate.getDate() + 7);
+          } else if (recurrence === 'Monthly') {
+            currentDate.setMonth(currentDate.getMonth() + 1);
+          }
         }
       }
 
@@ -257,6 +279,7 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
       await loadSchedule();
       setSelectedSlots([]);
       setIsSelectionMode(false);
+      setShowBlockModal(false); // Close modal after confirming
       alert(`Successfully blocked ${selectedSlots.length} slots${repeats > 1 ? ` with ${recurrence} recurrence` : ''}.`);
     } catch (e) {
       console.error(e);
@@ -447,7 +470,7 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
 
             {isSelectionMode && selectedSlots.length > 0 && (
               <button
-                onClick={handleConfirmSelection}
+                onClick={() => setShowBlockModal(true)} // Open modal to confirm selection
                 className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-xl font-black uppercase tracking-widest text-xs shadow-xl shadow-green-600/20 hover:scale-105 transition-all animate-in fade-in zoom-in duration-200"
               >
                 <span className="material-symbols-outlined text-sm">save</span>
@@ -569,79 +592,93 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
       </main >
 
       {showBlockModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowBlockModal(false)}></div>
-          <div className="relative bg-card-dark border border-border-dark w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="p-8 border-b border-border-dark flex justify-between items-center">
-              <div>
-                <h3 className="text-2xl font-black uppercase italic tracking-tighter">Block Facility Time</h3>
-                <p className="text-xs text-slate-500 font-bold uppercase mt-1">Manual availability override</p>
-              </div>
-              <button onClick={() => setShowBlockModal(false)} className="size-10 rounded-full border border-border-dark flex items-center justify-center hover:bg-white/5">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/50 backdrop-blur-sm" onClick={() => setShowBlockModal(false)}>
+          <div
+            className="relative bg-white dark:bg-card-dark w-full max-w-[500px] rounded-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header / Title Input */}
+            <div className="flex bg-slate-50 border-b border-border-dark px-4 py-2 justify-end">
+              <button onClick={() => setShowBlockModal(false)} className="text-slate-400 hover:text-slate-700">
                 <span className="material-symbols-outlined text-xl">close</span>
               </button>
             </div>
 
-            <div className="p-8 space-y-6">
-              <div>
-                <label className="text-[10px] font-black uppercase tracking-widest text-primary mb-3 block">Reason for Closure / Block Label</label>
-                <input
-                  value={blockLabel}
-                  onChange={(e) => setBlockLabel(e.target.value)}
-                  placeholder="e.g. Maintenance, Private Event"
-                  className="w-full bg-background-dark border-border-dark rounded-xl h-14 px-4 text-white font-bold outline-none focus:ring-2 focus:ring-primary placeholder:text-slate-600"
-                />
-              </div>
+            <div className="p-6 pt-2">
+              <input
+                autoFocus
+                value={blockLabel}
+                onChange={(e) => setBlockLabel(e.target.value)}
+                placeholder="Add title"
+                className="w-full text-2xl font-normal border-b-2 border-slate-200 focus:border-blue-500 outline-none py-2 bg-transparent text-slate-800 dark:text-white placeholder:text-slate-400/80 transition-all font-manrope"
+              />
 
-              <div>
-                <label className="text-[10px] font-black uppercase tracking-widest text-primary mb-3 block">Recurrence</label>
-                <div className="flex gap-2 bg-card-dark p-1 rounded-xl border border-border-dark relative">
-                  {['One-Time', 'Weekly', 'Monthly', 'Infinite'].map((opt) => (
+              <div className="mt-6 flex flex-col gap-4">
+                {/* Date/Time Row (Simplified Visual) */}
+                <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-300">
+                  <span className="material-symbols-outlined text-slate-400">schedule</span>
+                  <div>
+                    <span className="font-medium mr-2">
+                      {selectedSlots.length > 0
+                        ? new Date(selectedSlots[0].split('|')[0]).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+                        : 'Select date'
+                      }
+                    </span>
+                    <span>• {selectedSlots.length} slots selected</span>
+                  </div>
+                </div>
+
+                {/* Recurrence Dropdown */}
+                <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-300 relative group">
+                  <span className="material-symbols-outlined text-slate-400">repeat</span>
+                  <select
+                    value={recurrence}
+                    onChange={(e) => setRecurrence(e.target.value as any)}
+                    className="appearance-none bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 px-3 py-1.5 rounded cursor-pointer outline-none font-medium pr-8 transition-colors"
+                  >
+                    <option value="Does not repeat">Does not repeat</option>
+                    <option value="Daily">Daily</option>
+                    <option value="Weekly">Weekly on {new Date().toLocaleDateString('en-US', { weekday: 'long' })}</option>
+                    <option value="Monthly">Monthly</option>
+                    <option value="Every weekday (Mon-Fri)">Every weekday (Mon-Fri)</option>
+                    <option value="Infinite">Infinite (3 Years)</option>
+                  </select>
+                  <span className="material-symbols-outlined absolute left-[180px] pointer-events-none text-xs text-slate-500">arrow_drop_down</span>
+                </div>
+
+                {/* Court Scope */}
+                <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-300">
+                  <span className="material-symbols-outlined text-slate-400">location_on</span>
+                  <div className="flex gap-2">
                     <button
-                      key={opt}
-                      onClick={() => setRecurrence(opt as any)}
-                      className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-tight rounded-lg transition-all z-10 ${recurrence === opt ? 'bg-primary text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
+                      onClick={() => setBlockScope('Full Court')}
+                      className={`px-3 py-1.5 rounded text-xs font-bold transition-colors border ${blockScope === 'Full Court' ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}
                     >
-                      {opt}
+                      Full Court
                     </button>
-                  ))}
+                    <button
+                      onClick={() => setBlockScope('Half Court')}
+                      className={`px-3 py-1.5 rounded text-xs font-bold transition-colors border ${blockScope === 'Half Court' ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}
+                    >
+                      Half Court
+                    </button>
+                  </div>
                 </div>
-              </div>
-
-              <div>
-                <label className="text-[10px] font-black uppercase tracking-widest text-primary mb-3 block">Court Scope</label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => setBlockScope('Full Court')}
-                    className={`h-14 border-2 rounded-xl font-bold uppercase text-[10px] tracking-tight transition-all ${blockScope === 'Full Court' ? 'border-red-500 bg-red-500/10 text-white' : 'border-border-dark bg-card-dark text-slate-500'}`}>
-                    Block Full Court
-                  </button>
-                  <button
-                    onClick={() => setBlockScope('Half Court')}
-                    className={`h-14 border-2 rounded-xl font-bold uppercase text-[10px] tracking-tight transition-all ${blockScope === 'Half Court' ? 'border-blue-500 bg-blue-500/10 text-white' : 'border-border-dark bg-card-dark text-slate-500'}`}>
-                    Block Half Court
-                  </button>
-                </div>
-              </div>
-
-              <div className="bg-primary/5 border border-primary/20 p-5 rounded-2xl">
-                <div className="flex items-center gap-3 text-primary mb-2">
-                  <span className="material-symbols-outlined text-sm">info</span>
-                  <span className="text-[10px] font-black uppercase tracking-widest">Instruction</span>
-                </div>
-                <p className="text-xs text-slate-400 font-medium leading-relaxed">
-                  Tap the 30-min slots directly on the schedule grid after setting your policy.
-                  Recurrence: <span className="text-primary font-bold lowercase">{recurrence}</span>.
-                </p>
               </div>
             </div>
 
-            <div className="p-8 bg-background-dark/50 border-t border-border-dark">
+            <div className="px-6 py-4 flex justify-end gap-3 border-t border-slate-100 dark:border-border-dark mt-4">
               <button
                 onClick={() => setShowBlockModal(false)}
-                className="w-full py-4 bg-primary text-white font-black uppercase tracking-widest rounded-xl shadow-lg shadow-primary/20 hover:bg-orange-600 transition-all text-left"
+                className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-md transition-colors"
               >
-                Confirm Policy
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmSelection}
+                className="px-6 py-2 text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow-lg shadow-blue-500/20 transition-all"
+              >
+                Save
               </button>
             </div>
           </div>
