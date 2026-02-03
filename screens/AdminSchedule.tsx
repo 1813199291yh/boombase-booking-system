@@ -133,21 +133,49 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
 
       if (!blockName) return; // User cancelled
 
+      // Determine number of repeats
+      let repeats = 1;
+      if (recurrence === 'Weekly') repeats = 12; // 3 months approx
+      if (recurrence === 'Monthly') repeats = 12; // 1 year
+
       try {
-        await api.createBooking({
-          customerName: blockName,
-          email: 'admin@internal',
-          courtType: blockScope,
-          date: date,
-          time: time,
-          status: 'Declined', // Using 'Declined' as 'Block'
-          price: 0,
-          waiverSigned: true
-        } as any);
+        const promises = [];
+        const baseDate = new Date(date + 'T00:00:00'); // Ensure correct date parsing
+
+        for (let i = 0; i < repeats; i++) {
+          let targetDate = new Date(baseDate);
+
+          if (recurrence === 'Weekly') {
+            targetDate.setDate(baseDate.getDate() + (i * 7));
+          } else if (recurrence === 'Monthly') {
+            targetDate.setMonth(baseDate.getMonth() + i);
+          }
+          // For One-Time, i=0, so it stays baseDate
+
+          // Format back to YYYY-MM-DD
+          const y = targetDate.getFullYear();
+          const m = String(targetDate.getMonth() + 1).padStart(2, '0');
+          const d = String(targetDate.getDate()).padStart(2, '0');
+          const dateStr = `${y}-${m}-${d}`;
+
+          promises.push(api.createBooking({
+            customerName: blockName,
+            email: 'admin@internal',
+            courtType: blockScope,
+            date: dateStr,
+            time: time,
+            status: 'Declined', // Using 'Declined' as 'Block'
+            price: 0,
+            waiverSigned: true
+          } as any));
+        }
+
+        await Promise.all(promises);
         await loadSchedule();
+        alert(`Successfully created ${repeats} block(s).`);
       } catch (e) {
         console.error(e);
-        alert("Failed to block slot");
+        alert("Failed to block slot(s)");
       }
     }
   };
