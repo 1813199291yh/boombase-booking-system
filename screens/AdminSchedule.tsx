@@ -32,19 +32,6 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
   // Store full booking objects now, not just indices
   const [bookings, setBookings] = useState<any[]>([]);
 
-  useEffect(() => {
-    loadSchedule();
-  }, []);
-
-  const loadSchedule = async () => {
-    try {
-      const data = await api.getBookings();
-      setBookings(data);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
   // Determine the start of the current week (Monday)
   const getStartOfWeek = (d: Date) => {
     const day = d.getDay();
@@ -65,7 +52,29 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
   useEffect(() => {
     // Update the display string
     setSelectedWeek(getWeekString(currentWeekStart));
+
+    // Fetch data for the surrounding period (e.g., +/- 4 weeks)
+    // To ensure smooth navigation, we fetch a 3-month window centered on the current week
+    const fetchStart = new Date(currentWeekStart);
+    fetchStart.setMonth(fetchStart.getMonth() - 2); // -2 months
+
+    const fetchEnd = new Date(currentWeekStart);
+    fetchEnd.setMonth(fetchEnd.getMonth() + 2); // +2 months
+
+    const y1 = fetchStart.getFullYear(), m1 = String(fetchStart.getMonth() + 1).padStart(2, '0'), d1 = String(fetchStart.getDate()).padStart(2, '0');
+    const y2 = fetchEnd.getFullYear(), m2 = String(fetchEnd.getMonth() + 1).padStart(2, '0'), d2 = String(fetchEnd.getDate()).padStart(2, '0');
+
+    loadSchedule(`${y1}-${m1}-${d1}`, `${y2}-${m2}-${d2}`);
   }, [currentWeekStart]);
+
+  const loadSchedule = async (start?: string, end?: string) => {
+    try {
+      const data = await api.getBookings(start, end);
+      setBookings(data);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const generateTimeSlots = () => {
     const slots = [];

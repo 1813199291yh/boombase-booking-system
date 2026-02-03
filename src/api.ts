@@ -36,8 +36,14 @@ export const api = {
         return response.json();
     },
 
-    getBookings: async () => {
-        const response = await fetch(`${API_URL}/bookings`);
+    getBookings: async (start?: string, end?: string) => {
+        let url = `${API_URL}/bookings`;
+        if (start && end) {
+            // Append params
+            const params = new URLSearchParams({ start, end });
+            url += `?${params.toString()}`;
+        }
+        const response = await fetch(url);
         if (!response.ok) throw new Error('Failed to fetch bookings');
         return response.json();
     },

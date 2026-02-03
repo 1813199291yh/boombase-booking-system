@@ -148,16 +148,27 @@ const mapBooking = (b: any) => ({
     waiverSignature: b.waiver_signature
 });
 
-// Get all bookings (for Admin)
+// Get Bookings
 router.get('/bookings', async (req, res) => {
     try {
-        const { data, error } = await supabase
-            .from('bookings')
-            .select('*')
-            .order('created_at', { ascending: false });
+        const { start, end } = req.query;
+
+        let query = supabase.from('bookings').select('*');
+
+        if (start) {
+            query = query.gte('date', start);
+        }
+        if (end) {
+            query = query.lte('date', end);
+        }
+
+        const { data, error } = await query;
 
         if (error) throw error;
-        res.json(data.map(mapBooking));
+
+        // Map to frontend structure
+        const bookings = data.map(mapBooking);
+        res.json(bookings);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
