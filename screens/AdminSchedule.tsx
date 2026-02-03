@@ -215,8 +215,8 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
     if (recurrence === 'Monthly') repeats = 12; // 1 year
     if (recurrence === 'Infinite') repeats = 156; // 3 years (52 * 3)
 
-    // Generate Group ID for this batch
-    const groupId = crypto.randomUUID();
+    // Generate Group ID (Simplified for compatibility)
+    const groupId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
     try {
       const promises = [];

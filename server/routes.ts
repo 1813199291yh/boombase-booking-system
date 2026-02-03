@@ -38,7 +38,7 @@ router.post('/login', (req, res) => {
 // Create a booking & Payment Intent
 router.post('/bookings', async (req, res) => {
     try {
-        const { customerName, email, courtType, date, time, price, waiverName, waiverSignature, status } = req.body;
+        const { customerName, email, courtType, date, time, price, waiverName, waiverSignature, status, recurringGroupId } = req.body;
 
         let stripePaymentId = 'manual-block';
         let bookingStatus = 'Pending Approval';
@@ -74,7 +74,8 @@ router.post('/bookings', async (req, res) => {
                     stripe_payment_id: stripePaymentId,
                     waiver_signed: true,
                     waiver_name: waiverName,
-                    waiver_signature: waiverSignature
+                    waiver_signature: waiverSignature,
+                    recurring_group_id: recurringGroupId
                 }
             ])
             .select()
