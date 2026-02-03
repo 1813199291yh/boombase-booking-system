@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../src/api';
 import { CourtType } from '../types';
+import MiniCalendar from '../components/MiniCalendar';
 
 interface AdminScheduleProps {
   onNavigateToDashboard: () => void;
@@ -15,6 +16,7 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
   const [recurrence, setRecurrence] = useState<'Does not repeat' | 'Daily' | 'Weekly' | 'Monthly' | 'Every weekday (Mon-Fri)' | 'Infinite'>('Does not repeat');
   const [blockScope, setBlockScope] = useState<CourtType>('Full Court');
   const [blockLabel, setBlockLabel] = useState(''); // Default empty for "Add title" placeholder behavior
+  const [showCalendar, setShowCalendar] = useState(false); // Mini Calendar visibility state
 
   // Edit Block Modal State
   const [editingBlock, setEditingBlock] = useState<any>(null);
@@ -94,7 +96,7 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
 
   const generateTimeSlots = () => {
     const slots = [];
-    for (let hour = 8; hour <= 21; hour++) {
+    for (let hour = 6; hour <= 23; hour++) {
       for (let min of ["00", "30"]) {
         let displayHour = hour > 12 ? hour - 12 : hour;
         let period = hour >= 12 ? "PM" : "AM";
@@ -126,7 +128,11 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
     const day = String(d.getDate()).padStart(2, '0');
     const dateStr = `${year}-${month}-${day}`;
 
-    const hour = 8 + Math.floor(slotIdx / 2);
+    // Fix: Calculate hour starting from 6 AM
+    // slotIdx 0 -> 6:00 AM
+    // slotIdx 1 -> 6:30 AM
+    // hour = 6 + floor(idx / 2)
+    const hour = 6 + Math.floor(slotIdx / 2);
     const min = (slotIdx % 2) === 0 ? '00' : '30';
 
     let displayHour = hour > 12 ? hour - 12 : hour;
@@ -471,26 +477,57 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
         <header className="h-20 border-b border-border-dark px-8 flex items-center justify-between bg-white dark:bg-card-dark z-20">
           <div className="flex items-center gap-8">
             <h2 className="text-2xl font-black italic tracking-tighter uppercase">Schedule: <span className="text-primary">{selectedWeek}</span></h2>
-            <div className="flex bg-slate-100 dark:bg-background-dark p-1 rounded-xl gap-1">
+            <div className="flex bg-[#1E1E1E] dark:bg-card-dark rounded-xl p-1.5 gap-1 border border-white/5 shadow-inner relative">
+              {/* Date Navigator with MiniCalendar Poptop */}
+              <div className="relative z-50">
+                <button
+                  onClick={() => setShowCalendar(!showCalendar)}
+                  className="flex items-center gap-3 px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-white transition-all border border-transparent hover:border-white/10 active:scale-95"
+                >
+                  <span className="material-symbols-outlined text-slate-400">calendar_month</span>
+                  <span className="font-bold text-sm tracking-wide font-manrope">{selectedWeek}</span>
+                  <span className="material-symbols-outlined text-slate-500 text-sm">arrow_drop_down</span>
+                </button>
+
+                {showCalendar && (
+                  <MiniCalendar
+                    selectedDate={currentWeekStart}
+                    onSelectDate={(date) => {
+                      // Adjust to Monday
+                      const day = date.getDay();
+                      const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+                      const newStart = new Date(date);
+                      newStart.setDate(diff);
+                      setCurrentWeekStart(newStart);
+                      setShowCalendar(false);
+                    }}
+                    onClose={() => setShowCalendar(false)}
+                  />
+                )}
+              </div>
+
+              <div className="w-px bg-white/10 mx-1"></div>
+
               <button
                 onClick={() => {
-                  const prev = new Date(currentWeekStart);
-                  prev.setDate(prev.getDate() - 7);
-                  setCurrentWeekStart(prev);
+                  const d = new Date(currentWeekStart);
+                  d.setDate(d.getDate() - 7);
+                  setCurrentWeekStart(d);
                 }}
-                className="px-4 py-2 text-[10px] font-black uppercase tracking-widest bg-white dark:bg-card-dark rounded-lg shadow-sm hover:text-primary transition-colors"
+                className="w-9 h-9 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
               >
-                Prev Week
+                <span className="material-symbols-outlined">chevron_left</span>
               </button>
+
               <button
                 onClick={() => {
-                  const next = new Date(currentWeekStart);
-                  next.setDate(next.getDate() + 7);
-                  setCurrentWeekStart(next);
+                  const d = new Date(currentWeekStart);
+                  d.setDate(d.getDate() + 7);
+                  setCurrentWeekStart(d);
                 }}
-                className="px-4 py-2 text-[10px] font-black uppercase tracking-widest bg-white dark:bg-card-dark rounded-lg shadow-sm hover:text-primary transition-colors"
+                className="w-9 h-9 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
               >
-                Next Week
+                <span className="material-symbols-outlined">chevron_right</span>
               </button>
             </div>
           </div>
