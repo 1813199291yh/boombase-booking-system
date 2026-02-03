@@ -26,6 +26,16 @@ export const api = {
         return response.json();
     },
 
+    createBookingsBulk: async (bookings: Partial<Booking>[]) => {
+        const response = await fetch(`${API_URL}/bookings/bulk`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bookings }),
+        });
+        if (!response.ok) throw new Error('Failed to create bookings');
+        return response.json();
+    },
+
     getBookings: async () => {
         const response = await fetch(`${API_URL}/bookings`);
         if (!response.ok) throw new Error('Failed to fetch bookings');

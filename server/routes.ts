@@ -98,6 +98,45 @@ router.post('/bookings', async (req, res) => {
     }
 });
 
+// Bulk Create Bookings
+router.post('/bookings/bulk', async (req, res) => {
+    try {
+        const { bookings } = req.body;
+        if (!bookings || !Array.isArray(bookings) || bookings.length === 0) {
+            return res.status(400).json({ error: 'Invalid bookings array' });
+        }
+
+        // Prepare data for insertion (map fields to snake_case)
+        const dbBookings = bookings.map((b: any) => ({
+            customer_name: b.customerName,
+            email: b.email,
+            court_type: b.courtType,
+            date: b.date,
+            time: b.time,
+            price: b.price,
+            status: b.status || 'Pending Approval',
+            stripe_payment_id: 'manual-bulk-block',
+            waiver_signed: b.waiverSigned,
+            waiver_name: b.waiverName,
+            recurring_group_id: b.recurringGroupId
+        }));
+
+        // Insert in batches if necessary (Supabase handles batch insert well, but 3000 might need chunking)
+        // For simplicity, let's try direct insert first. Supabase limit is usually high.
+        const { data, error } = await supabase
+            .from('bookings')
+            .insert(dbBookings)
+            .select();
+
+        if (error) throw error;
+
+        res.json({ success: true, count: data.length });
+    } catch (error: any) {
+        console.error('Error bulk creating bookings:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Helper to map DB to Frontend
 const mapBooking = (b: any) => ({
     ...b,

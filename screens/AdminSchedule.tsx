@@ -219,7 +219,7 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
     const groupId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
     try {
-      const promises = [];
+      const bookingsBatch = [];
 
       for (const slotKey of selectedSlots) {
         const [slotDate, slotTime] = slotKey.split('|');
@@ -239,7 +239,7 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
           const d = String(targetDate.getDate()).padStart(2, '0');
           const dateStr = `${y}-${m}-${d}`;
 
-          promises.push(api.createBooking({
+          bookingsBatch.push({
             customerName: blockName,
             email: 'admin@internal',
             courtType: blockScope,
@@ -249,11 +249,11 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
             price: 0,
             waiverSigned: true,
             recurringGroupId: (recurrence !== 'One-Time') ? groupId : undefined
-          } as any));
+          });
         }
       }
 
-      await Promise.all(promises);
+      await api.createBookingsBulk(bookingsBatch);
       await loadSchedule();
       setSelectedSlots([]);
       setIsSelectionMode(false);
