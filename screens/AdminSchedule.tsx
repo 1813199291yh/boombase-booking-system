@@ -69,6 +69,22 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
 
   const loadSchedule = async (start?: string, end?: string) => {
     try {
+      if (!start || !end) {
+        // Recalculate range based on currentWeekStart if not provided
+        // This is crucial for re-fetching after updates (like creating blocks)
+        const fetchStart = new Date(currentWeekStart);
+        fetchStart.setMonth(fetchStart.getMonth() - 2);
+
+        const fetchEnd = new Date(currentWeekStart);
+        fetchEnd.setMonth(fetchEnd.getMonth() + 2);
+
+        const y1 = fetchStart.getFullYear(), m1 = String(fetchStart.getMonth() + 1).padStart(2, '0'), d1 = String(fetchStart.getDate()).padStart(2, '0');
+        const y2 = fetchEnd.getFullYear(), m2 = String(fetchEnd.getMonth() + 1).padStart(2, '0'), d2 = String(fetchEnd.getDate()).padStart(2, '0');
+
+        start = `${y1}-${m1}-${d1}`;
+        end = `${y2}-${m2}-${d2}`;
+      }
+
       const data = await api.getBookings(start, end);
       setBookings(data);
     } catch (e) {
