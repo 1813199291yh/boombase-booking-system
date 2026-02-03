@@ -52,6 +52,16 @@ export const api = {
         return response.json();
     },
 
+    deleteBookingSeries: async (groupId: string) => {
+        const response = await fetch(`${API_URL}/bookings/delete-series`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ groupId }),
+        });
+        if (!response.ok) throw new Error('Failed to delete series');
+        return response.json();
+    },
+
     // Payouts
     getPayouts: async () => {
         const response = await fetch(`${API_URL}/payouts`);

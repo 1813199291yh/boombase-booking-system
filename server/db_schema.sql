@@ -14,7 +14,8 @@ create table public.bookings (
   stripe_payment_id text,
   waiver_signed boolean default false,
   waiver_name text,
-  waiver_signature text
+  waiver_signature text,
+  recurring_group_id text
 );
 
 -- Create Payouts Table

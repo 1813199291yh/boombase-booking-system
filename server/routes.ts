@@ -182,6 +182,26 @@ router.post('/bookings/:id/update', async (req, res) => {
     }
 });
 
+// Delete Booking Series
+router.post('/bookings/delete-series', async (req, res) => {
+    try {
+        const { groupId } = req.body;
+        if (!groupId) return res.status(400).json({ error: 'Missing groupId' });
+
+        // Update all bookings in this group to 'Cancelled'
+        const { data, error } = await supabase
+            .from('bookings')
+            .update({ status: 'Cancelled' })
+            .eq('recurring_group_id', groupId)
+            .select();
+
+        if (error) throw error;
+        res.json({ success: true, count: data.length });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Settings Routes
 router.get('/settings', async (req, res) => {
     try {

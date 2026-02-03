@@ -12,7 +12,7 @@ interface AdminScheduleProps {
 const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, onNavigateToPayouts, onExit }) => {
   const [selectedWeek, setSelectedWeek] = useState('Oct 21 – 27, 2024');
   const [showBlockModal, setShowBlockModal] = useState(false);
-  const [recurrence, setRecurrence] = useState<'One-Time' | 'Weekly' | 'Monthly'>('One-Time');
+  const [recurrence, setRecurrence] = useState<'One-Time' | 'Weekly' | 'Monthly' | 'Infinite'>('One-Time');
   const [blockScope, setBlockScope] = useState<CourtType>('Full Court');
   const [blockLabel, setBlockLabel] = useState('Facility Block');
 
@@ -23,6 +23,10 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
   // Multi-Select State
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedSlots, setSelectedSlots] = useState<string[]>([]); // Format: "YYYY-MM-DD|HH:mm PM"
+
+  // Drag State
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState<{ day: number, hour: number } | null>(null);
 
   // Store full booking objects now, not just indices
   const [bookings, setBookings] = useState<any[]>([]);
@@ -209,6 +213,10 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
     let repeats = 1;
     if (recurrence === 'Weekly') repeats = 12; // 3 months approx
     if (recurrence === 'Monthly') repeats = 12; // 1 year
+    if (recurrence === 'Infinite') repeats = 156; // 3 years (52 * 3)
+
+    // Generate Group ID for this batch
+    const groupId = crypto.randomUUID();
 
     try {
       const promises = [];
@@ -220,7 +228,7 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
         for (let i = 0; i < repeats; i++) {
           let targetDate = new Date(baseDate);
 
-          if (recurrence === 'Weekly') {
+          if (recurrence === 'Weekly' || recurrence === 'Infinite') {
             targetDate.setDate(baseDate.getDate() + (i * 7));
           } else if (recurrence === 'Monthly') {
             targetDate.setMonth(baseDate.getMonth() + i);
@@ -239,7 +247,8 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
             time: slotTime,
             status: 'Declined',
             price: 0,
-            waiverSigned: true
+            waiverSigned: true,
+            recurringGroupId: (recurrence !== 'One-Time') ? groupId : undefined
           } as any));
         }
       }
@@ -267,6 +276,64 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
     }
   };
 
+  const handleDeleteSeries = async () => {
+    if (!editingBlock || !editingBlock.recurringGroupId) return;
+    if (!window.confirm("Delete this entire recurring series? Future blocks will be removed.")) return;
+
+    try {
+      // Assuming a simplistic client-side approach or new endpoint if available.
+      // Since we can't easily add a new route, we'll try to use a Supabase query if exposed or just alert limit.
+      // Actually, we can use `api` to do a raw request if we assume the backend structure.
+      // For now, let's just use the `api` assuming we add `deleteBookingSeries` or similar logic there.
+      // If we can't edit `api.ts`, we'd be stuck. But we can edit `api.ts`.
+      // Let's assume we will add `deleteBookingSeries` to `api.ts` right after this.
+      await api.deleteBookingSeries(editingBlock.recurringGroupId);
+
+      setEditingBlock(null);
+      await loadSchedule();
+    } catch (e) {
+      console.error(e);
+      alert("Failed to delete series");
+    }
+  };
+
+  // Drag Handlers
+  const handleSlotMouseDown = (dayIdx: number, hourIdx: number) => {
+    if (!isSelectionMode) return;
+    setIsDragging(true);
+    setDragStart({ day: dayIdx, hour: hourIdx });
+    const { date, time } = getSlotDateTime(dayIdx, hourIdx);
+    const slotKey = `${date}|${time}`;
+    if (!selectedSlots.includes(slotKey)) {
+      setSelectedSlots([...selectedSlots, slotKey]);
+    }
+  };
+
+  const handleSlotMouseEnter = (dayIdx: number, hourIdx: number) => {
+    if (!isSelectionMode || !isDragging || !dragStart) return;
+
+    // Calculate range
+    const minDay = Math.min(dragStart.day, dayIdx);
+    const maxDay = Math.max(dragStart.day, dayIdx);
+    const minHour = Math.min(dragStart.hour, hourIdx);
+    const maxHour = Math.max(dragStart.hour, hourIdx); // Corrected property access
+
+    const newSlots = new Set(selectedSlots);
+
+    for (let d = minDay; d <= maxDay; d++) {
+      for (let h = minHour; h <= maxHour; h++) {
+        const { date, time } = getSlotDateTime(d, h);
+        newSlots.add(`${date}|${time}`);
+      }
+    }
+    setSelectedSlots(Array.from(newSlots));
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    setDragStart(null);
+  };
+
   const handleRename = async () => {
     if (!editingBlock) return;
     if (editName && editName !== editingBlock.customerName) {
@@ -284,7 +351,10 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 dark:bg-background-dark font-manrope overflow-hidden">
+    <div
+      className="flex h-screen bg-slate-50 dark:bg-background-dark font-manrope overflow-hidden"
+      onMouseUp={handleMouseUp}
+    >
       <aside className="w-64 border-r border-border-dark bg-white dark:bg-card-dark flex flex-col justify-between p-6 z-30">
         <div className="flex flex-col gap-8">
           <div className="flex items-center gap-3 cursor-pointer" onClick={onExit}>
@@ -465,7 +535,12 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
                     return (
                       <div
                         key={dIdx}
-                        onClick={() => handleBlockSlot(dIdx, hIdx)}
+                        onMouseDown={() => {
+                          if (isSelectionMode) handleSlotMouseDown(dIdx, hIdx);
+                          else handleBlockSlot(dIdx, hIdx);
+                        }}
+                        onMouseEnter={() => handleSlotMouseEnter(dIdx, hIdx)}
+                        onClick={() => !isSelectionMode && handleBlockSlot(dIdx, hIdx)}
                         className={`${borderClass} relative group transition-all cursor-pointer overflow-hidden ${bgClass}`}
                       >
                         {isOccupied && (
@@ -520,22 +595,16 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
 
               <div>
                 <label className="text-[10px] font-black uppercase tracking-widest text-primary mb-3 block">Recurrence</label>
-                <div className="grid grid-cols-3 gap-3">
-                  <button
-                    onClick={() => setRecurrence('One-Time')}
-                    className={`h-14 border-2 rounded-xl font-bold uppercase text-[10px] tracking-tight transition-all ${recurrence === 'One-Time' ? 'border-primary bg-primary/10 text-white' : 'border-border-dark bg-card-dark text-slate-500'}`}>
-                    One Time
-                  </button>
-                  <button
-                    onClick={() => setRecurrence('Weekly')}
-                    className={`h-14 border-2 rounded-xl font-bold uppercase text-[10px] tracking-tight transition-all ${recurrence === 'Weekly' ? 'border-primary bg-primary/10 text-white' : 'border-border-dark bg-card-dark text-slate-500'}`}>
-                    Weekly
-                  </button>
-                  <button
-                    onClick={() => setRecurrence('Monthly')}
-                    className={`h-14 border-2 rounded-xl font-bold uppercase text-[10px] tracking-tight transition-all ${recurrence === 'Monthly' ? 'border-primary bg-primary/10 text-white' : 'border-border-dark bg-card-dark text-slate-500'}`}>
-                    Monthly
-                  </button>
+                <div className="flex gap-2 bg-card-dark p-1 rounded-xl border border-border-dark relative">
+                  {['One-Time', 'Weekly', 'Monthly', 'Infinite'].map((opt) => (
+                    <button
+                      key={opt}
+                      onClick={() => setRecurrence(opt as any)}
+                      className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-tight rounded-lg transition-all z-10 ${recurrence === opt ? 'bg-primary text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
+                    >
+                      {opt}
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -619,6 +688,14 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
                   >
                     Unblock Slot
                   </button>
+                  {editingBlock.recurringGroupId && (
+                    <button
+                      onClick={handleDeleteSeries}
+                      className="w-full h-12 border-2 border-red-500/20 text-red-500 font-black uppercase tracking-widest rounded-xl hover:bg-red-500 hover:text-white transition-all text-xs"
+                    >
+                      Delete Entire Series
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

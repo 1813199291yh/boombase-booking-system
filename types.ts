@@ -25,5 +25,6 @@ export interface Booking {
   waiverSigned: boolean;
   waiverName?: string;
   waiverSignature?: string;
+  recurringGroupId?: string;
   timestamp: number;
 }
