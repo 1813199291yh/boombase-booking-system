@@ -113,15 +113,47 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
         alert("This slot has a pending request. Please reject/approve it from the Dashboard first.");
         return;
       }
+
+      // Handle Blocked Slot (Declined/Facility Block)
       if (existing.status === 'Declined') {
-        alert("Unblocking not fully implemented in API yet.");
+        // Offer choice: Unblock or Rename
+        // Since we can't easily show a custom UI without a lot of state, let's use check.
+        const choice = window.confirm(`Manage Block: "${existing.customerName}"\n\nClick OK to UNBLOCK.\nClick Cancel to Rename.`);
+
+        if (choice) {
+          // Unblock -> Cancel
+          try {
+            await api.updateBookingStatus(existing.id, 'Cancelled');
+            await loadSchedule();
+          } catch (e) {
+            console.error(e);
+            alert("Failed to unblock slot");
+          }
+        } else {
+          // Rename -> Prompt
+          const newName = window.prompt("Enter new name for this block:", existing.customerName);
+          if (newName && newName !== existing.customerName) {
+            try {
+              await api.updateBookingDetails(existing.id, { customerName: newName });
+              await loadSchedule();
+            } catch (e) {
+              console.error(e);
+              alert("Failed to rename block");
+            }
+          }
+        }
         return;
       }
     } else {
-      // Create Block
+      // Create Block - Ask for Name
+      // Default to "Facility Block" but allow edit
+      const blockName = window.prompt("Enter a label for this block:", "Facility Block");
+
+      if (!blockName) return; // User cancelled
+
       try {
         await api.createBooking({
-          customerName: 'Facility Block',
+          customerName: blockName,
           email: 'admin@internal',
           courtType: blockScope,
           date: date,

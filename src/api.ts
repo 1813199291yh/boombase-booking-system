@@ -42,6 +42,16 @@ export const api = {
         return response.json();
     },
 
+    updateBookingDetails: async (id: string, updates: any) => {
+        const response = await fetch(`${API_URL}/bookings/${id}/update`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updates),
+        });
+        if (!response.ok) throw new Error('Failed to update booking details');
+        return response.json();
+    },
+
     // Payouts
     getPayouts: async () => {
         const response = await fetch(`${API_URL}/payouts`);

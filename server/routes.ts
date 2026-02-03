@@ -140,6 +140,37 @@ router.post('/bookings/:id/status', async (req, res) => {
     }
 });
 
+// Update booking details (e.g. rename)
+router.post('/bookings/:id/update', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const updates = req.body; // { customerName, courtType, etc }
+
+        // Map frontend camelCase to snake_case if necessary, or just rely on what's passed
+        // For simplicity, let's assume we map 'customerName' to 'customer_name'
+        const dbUpdates: any = {};
+        if (updates.customerName) dbUpdates.customer_name = updates.customerName;
+        // Add other fields if needed
+
+        if (Object.keys(dbUpdates).length === 0) {
+            return res.status(400).json({ error: 'No valid fields to update' });
+        }
+
+        const { data, error } = await supabase
+            .from('bookings')
+            .update(dbUpdates)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        res.json(data);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Settings Routes
 router.get('/settings', async (req, res) => {
     try {
