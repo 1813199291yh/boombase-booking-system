@@ -16,7 +16,8 @@ const getTransporter = () => {
 
 
 export const sendAdminNotification = async (booking: any) => {
-    const adminEmail = 'damon@theboombase.com';
+    // Send to the configured admin email (defaults to checking env)
+    const adminEmail = process.env.ADMIN_EMAIL || 'damon@theboombase.com';
 
     const mailOptions = {
         from: process.env.EMAIL_USER,
