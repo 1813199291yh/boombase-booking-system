@@ -21,6 +21,18 @@ const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [bookings, setBookings] = useState<Booking[]>([]);
 
+  // Check auth persistence on load
+  React.useEffect(() => {
+    const storedAuth = localStorage.getItem('isAdmin');
+    if (storedAuth === 'true') {
+      setIsAuthenticated(true);
+      // Optional: restore last screen if needed, but let's default to Dashboard if auth
+      // For now, if they land on root but are auth, maybe show Dashboard? 
+      // User didn't specify, but usually you want to stay logged in. 
+      // The current logic doesn't auto-navigate, which is fine, but if they try to go to admin page it will work.
+    }
+  }, []);
+
   // Fetch bookings on load
   React.useEffect(() => {
     loadBookings();
@@ -58,12 +70,14 @@ const App: React.FC = () => {
   const handleAdminLogin = (success: boolean) => {
     if (success) {
       setIsAuthenticated(true);
+      localStorage.setItem('isAdmin', 'true');
       setCurrentScreen(ScreenType.ADMIN_DASHBOARD);
     }
   };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
+    localStorage.removeItem('isAdmin');
     setCurrentScreen(ScreenType.LANDING);
   };
 

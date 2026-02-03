@@ -97,6 +97,17 @@ router.post('/bookings', async (req, res) => {
     }
 });
 
+// Helper to map DB to Frontend
+const mapBooking = (b: any) => ({
+    ...b,
+    customerName: b.customer_name,
+    courtType: b.court_type,
+    stripePaymentId: b.stripe_payment_id,
+    waiverSigned: b.waiver_signed,
+    waiverName: b.waiver_name,
+    waiverSignature: b.waiver_signature
+});
+
 // Get all bookings (for Admin)
 router.get('/bookings', async (req, res) => {
     try {
@@ -106,7 +117,7 @@ router.get('/bookings', async (req, res) => {
             .order('created_at', { ascending: false });
 
         if (error) throw error;
-        res.json(data);
+        res.json(data.map(mapBooking));
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -165,7 +176,7 @@ router.post('/bookings/:id/update', async (req, res) => {
 
         if (error) throw error;
 
-        res.json(data);
+        res.json(mapBooking(data));
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
