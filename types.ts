@@ -24,7 +24,8 @@ export interface Booking {
   price: number;
   waiverSigned: boolean;
   waiverName?: string;
-  waiverSignature?: string;
+  waiverSignature?: string; // Base64
   recurringGroupId?: string;
+  color?: string; // Hex code or tailwind class for block color
   timestamp: number;
 }

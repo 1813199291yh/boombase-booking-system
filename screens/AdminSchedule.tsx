@@ -23,6 +23,21 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
   const [editName, setEditName] = useState('');
   const [showDeleteOptions, setShowDeleteOptions] = useState(false); // Toggle for single vs series delete UI
 
+  // Color Palette
+  const COLORS = [
+    { label: 'Gray', value: '#3f3f46' }, // Zinc 700
+    { label: 'Red', value: '#ef4444' }, // Red 500
+    { label: 'Orange', value: '#f97316' }, // Orange 500
+    { label: 'Amber', value: '#f59e0b' }, // Amber 500
+    { label: 'Green', value: '#22c55e' }, // Green 500
+    { label: 'Blue', value: '#3b82f6' }, // Blue 500
+    { label: 'Indigo', value: '#6366f1' }, // Indigo 500
+    { label: 'Purple', value: '#a855f7' }, // Purple 500
+    { label: 'Pink', value: '#ec4899' }, // Pink 500
+  ];
+  const [selectedColor, setSelectedColor] = useState(COLORS[0].value);
+  const [editColor, setEditColor] = useState(COLORS[0].value);
+
   // Multi-Select State
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedSlots, setSelectedSlots] = useState<string[]>([]); // Format: "YYYY-MM-DD|HH:mm PM"
@@ -178,6 +193,7 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
       if (existing.status === 'Declined') {
         setEditingBlock(existing);
         setEditName(existing.customerName || '');
+        setEditColor(existing.color || COLORS[0].value);
         return;
       }
     } else {
@@ -220,7 +236,8 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
             time: time,
             status: 'Declined', // Using 'Declined' as 'Block'
             price: 0,
-            waiverSigned: true
+            waiverSigned: true,
+            color: selectedColor
           } as any));
         }
 
@@ -288,7 +305,8 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
               status: 'Declined',
               price: 0,
               waiverSigned: true,
-              recurringGroupId: (recurrence !== 'Does not repeat') ? groupId : undefined
+              recurringGroupId: (recurrence !== 'Does not repeat') ? groupId : undefined,
+              color: selectedColor
             });
 
             count++;
@@ -405,9 +423,15 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
 
   const handleRename = async () => {
     if (!editingBlock) return;
-    if (editName && editName !== editingBlock.customerName) {
+    const hasNameChange = editName && editName !== editingBlock.customerName;
+    const hasColorChange = editColor && editColor !== editingBlock.color;
+
+    if (hasNameChange || hasColorChange) {
       try {
-        await api.updateBookingDetails(editingBlock.id, { customerName: editName });
+        await api.updateBookingDetails(editingBlock.id, {
+          customerName: editName,
+          color: editColor
+        });
         setEditingBlock(null);
         await loadSchedule();
       } catch (e) {
@@ -630,6 +654,16 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
                         textClass = 'text-blue-500';
                         borderColor = 'border-blue-500/30';
                       }
+
+                      // Custom Color Override for Blocks (Declined/Facility Block)
+                      if (isManualBlock && booking.color) {
+                        const c = booking.color;
+                        // Apply style directly via style prop for custom colors
+                        // We will leave classes empty/neutral to let style take over
+                        bgClass = ``;
+                        textClass = `text-white`;
+                        borderColor = `border-white/20`;
+                      }
                     }
 
                     return (
@@ -642,6 +676,7 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
                         onMouseEnter={() => handleSlotMouseEnter(dIdx, hIdx)}
                         onClick={() => !isSelectionMode && handleBlockSlot(dIdx, hIdx)}
                         className={`${borderClass} relative group transition-all cursor-pointer overflow-hidden ${bgClass}`}
+                        style={isManualBlock && booking?.color ? { backgroundColor: booking.color } : {}}
                       >
                         {isOccupied && (
                           <div
@@ -791,6 +826,22 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
                         className="w-full bg-background-dark border-border-dark rounded-xl h-12 px-4 text-white font-bold outline-none focus:ring-2 focus:ring-primary placeholder:text-slate-600 text-sm"
                         autoFocus
                       />
+                    </div>
+
+                    {/* Color Picker (Edit Modal) */}
+                    <div>
+                      <label className="text-[10px] font-black uppercase tracking-widest text-primary mb-2 block">Block Color</label>
+                      <div className="flex gap-2 flex-wrap">
+                        {COLORS.map((c) => (
+                          <button
+                            key={c.value}
+                            title={c.label}
+                            onClick={() => setEditColor(c.value)}
+                            className={`size-8 rounded-full transition-transform hover:scale-110 ${editColor === c.value ? 'ring-2 ring-offset-2 ring-primary scale-110' : ''}`}
+                            style={{ backgroundColor: c.value }}
+                          />
+                        ))}
+                      </div>
                     </div>
 
                     <div className="flex flex-col gap-3 pt-2">

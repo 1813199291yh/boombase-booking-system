@@ -15,7 +15,8 @@ create table public.bookings (
   waiver_signed boolean default false,
   waiver_name text,
   waiver_signature text,
-  recurring_group_id text
+  recurring_group_id text,
+  color text
 );
 
 -- Create Payouts Table
