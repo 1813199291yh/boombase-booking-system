@@ -19,6 +19,7 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
   // Edit Block Modal State
   const [editingBlock, setEditingBlock] = useState<any>(null);
   const [editName, setEditName] = useState('');
+  const [showDeleteOptions, setShowDeleteOptions] = useState(false); // Toggle for single vs series delete UI
 
   // Multi-Select State
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -289,6 +290,14 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
 
   const handleUnblock = async () => {
     if (!editingBlock) return;
+
+    // If it's a series, show the options instead of acting immediately
+    if (editingBlock.recurringGroupId) {
+      setShowDeleteOptions(true);
+      return;
+    }
+
+    // Default single delete behavior
     try {
       await api.updateBookingStatus(editingBlock.id, 'Cancelled');
       setEditingBlock(null);
@@ -301,22 +310,28 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
 
   const handleDeleteSeries = async () => {
     if (!editingBlock || !editingBlock.recurringGroupId) return;
-    if (!window.confirm("Delete this entire recurring series? Future blocks will be removed.")) return;
-
+    // Direct call now, no confirm needed here as UI will handle it
     try {
-      // Assuming a simplistic client-side approach or new endpoint if available.
-      // Since we can't easily add a new route, we'll try to use a Supabase query if exposed or just alert limit.
-      // Actually, we can use `api` to do a raw request if we assume the backend structure.
-      // For now, let's just use the `api` assuming we add `deleteBookingSeries` or similar logic there.
-      // If we can't edit `api.ts`, we'd be stuck. But we can edit `api.ts`.
-      // Let's assume we will add `deleteBookingSeries` to `api.ts` right after this.
       await api.deleteBookingSeries(editingBlock.recurringGroupId);
-
       setEditingBlock(null);
+      setShowDeleteOptions(false);
       await loadSchedule();
     } catch (e) {
       console.error(e);
       alert("Failed to delete series");
+    }
+  };
+
+  const handleSingleDeleteFromSeries = async () => {
+    if (!editingBlock) return;
+    try {
+      await api.updateBookingStatus(editingBlock.id, 'Cancelled');
+      setEditingBlock(null);
+      setShowDeleteOptions(false);
+      await loadSchedule();
+    } catch (e) {
+      console.error(e);
+      alert("Failed to unblock slot");
     }
   };
 
@@ -701,39 +716,67 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
               </div>
 
               <div className="p-6 space-y-6">
-                <div>
-                  <label className="text-[10px] font-black uppercase tracking-widest text-primary mb-2 block">Block Label</label>
-                  <input
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    placeholder="e.g. Maintenance"
-                    className="w-full bg-background-dark border-border-dark rounded-xl h-12 px-4 text-white font-bold outline-none focus:ring-2 focus:ring-primary placeholder:text-slate-600 text-sm"
-                    autoFocus
-                  />
-                </div>
+                {!showDeleteOptions ? (
+                  <>
+                    <div>
+                      <label className="text-[10px] font-black uppercase tracking-widest text-primary mb-2 block">Block Label</label>
+                      <input
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        placeholder="e.g. Maintenance"
+                        className="w-full bg-background-dark border-border-dark rounded-xl h-12 px-4 text-white font-bold outline-none focus:ring-2 focus:ring-primary placeholder:text-slate-600 text-sm"
+                        autoFocus
+                      />
+                    </div>
 
-                <div className="flex flex-col gap-3 pt-2">
-                  <button
-                    onClick={handleRename}
-                    className="w-full h-12 bg-primary text-white font-black uppercase tracking-widest rounded-xl shadow-lg shadow-primary/20 hover:bg-orange-600 transition-all text-xs"
-                  >
-                    Save Changes
-                  </button>
-                  <button
-                    onClick={handleUnblock}
-                    className="w-full h-12 border-2 border-red-500/20 text-red-500 font-black uppercase tracking-widest rounded-xl hover:bg-red-500 hover:text-white transition-all text-xs"
-                  >
-                    Unblock Slot
-                  </button>
-                  {editingBlock.recurringGroupId && (
-                    <button
-                      onClick={handleDeleteSeries}
-                      className="w-full h-12 border-2 border-red-500/20 text-red-500 font-black uppercase tracking-widest rounded-xl hover:bg-red-500 hover:text-white transition-all text-xs"
-                    >
-                      Delete Entire Series
-                    </button>
-                  )}
-                </div>
+                    <div className="flex flex-col gap-3 pt-2">
+                      <button
+                        onClick={handleRename}
+                        className="w-full h-12 bg-primary text-white font-black uppercase tracking-widest rounded-xl shadow-lg shadow-primary/20 hover:bg-orange-600 transition-all text-xs"
+                      >
+                        Save Changes
+                      </button>
+                      <button
+                        onClick={handleUnblock}
+                        className="w-full h-12 border-2 border-red-500/20 text-red-500 font-black uppercase tracking-widest rounded-xl hover:bg-red-500 hover:text-white transition-all text-xs flex items-center justify-center gap-2"
+                      >
+                        <span className="material-symbols-outlined text-base">delete</span>
+                        Delete
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="animate-in fade-in slide-in-from-right-4 duration-200">
+                    <div className="flex items-center gap-3 mb-6 bg-red-500/10 p-4 rounded-xl border border-red-500/20 text-red-400">
+                      <span className="material-symbols-outlined text-2xl">warning</span>
+                      <div className="text-xs font-medium leading-relaxed">
+                        This is a recurring event. <br />
+                        Would you like to delete just this instance or the entire series?
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-3">
+                      <button
+                        onClick={handleSingleDeleteFromSeries}
+                        className="w-full h-12 bg-white text-slate-800 font-black uppercase tracking-widest rounded-xl hover:bg-slate-200 transition-all text-xs"
+                      >
+                        Delete This Event Only
+                      </button>
+                      <button
+                        onClick={handleDeleteSeries}
+                        className="w-full h-12 bg-red-500 text-white font-black uppercase tracking-widest rounded-xl shadow-lg shadow-red-500/20 hover:bg-red-600 transition-all text-xs"
+                      >
+                        Delete All Events
+                      </button>
+                      <button
+                        onClick={() => setShowDeleteOptions(false)}
+                        className="w-full h-10 text-slate-500 font-bold uppercase tracking-widest hover:text-white transition-all text-[10px] mt-2"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
