@@ -20,6 +20,10 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
   const [editingBlock, setEditingBlock] = useState<any>(null);
   const [editName, setEditName] = useState('');
 
+  // Multi-Select State
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedSlots, setSelectedSlots] = useState<string[]>([]); // Format: "YYYY-MM-DD|HH:mm PM"
+
   // Store full booking objects now, not just indices
   const [bookings, setBookings] = useState<any[]>([]);
 
@@ -107,7 +111,21 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
 
   const handleBlockSlot = async (dayIdx: number, hourIdx: number) => {
     const { date, time } = getSlotDateTime(dayIdx, hourIdx);
+
+    // Handles Multi-Select Mode
+    if (isSelectionMode) {
+      const slotKey = `${date}|${time}`;
+      if (selectedSlots.includes(slotKey)) {
+        setSelectedSlots(selectedSlots.filter(s => s !== slotKey));
+      } else {
+        setSelectedSlots([...selectedSlots, slotKey]);
+      }
+      return;
+    }
+
     const existing = bookings.find(b => b.date === date && b.time === time);
+
+
 
     if (existing && existing.status !== 'Cancelled' && existing.status !== 'Refunded') {
       if (existing.status === 'Confirmed') {
@@ -177,6 +195,63 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
         console.error(e);
         alert("Failed to block slot(s)");
       }
+    }
+  };
+
+  const handleConfirmSelection = async () => {
+    if (selectedSlots.length === 0) return;
+
+    // Ask for label one last time or use default
+    const blockName = window.prompt(`Blocking ${selectedSlots.length} slots. Enter label:`, blockLabel);
+    if (!blockName) return;
+
+    // Determine number of repeats per slot
+    let repeats = 1;
+    if (recurrence === 'Weekly') repeats = 12; // 3 months approx
+    if (recurrence === 'Monthly') repeats = 12; // 1 year
+
+    try {
+      const promises = [];
+
+      for (const slotKey of selectedSlots) {
+        const [slotDate, slotTime] = slotKey.split('|');
+        const baseDate = new Date(slotDate + 'T00:00:00');
+
+        for (let i = 0; i < repeats; i++) {
+          let targetDate = new Date(baseDate);
+
+          if (recurrence === 'Weekly') {
+            targetDate.setDate(baseDate.getDate() + (i * 7));
+          } else if (recurrence === 'Monthly') {
+            targetDate.setMonth(baseDate.getMonth() + i);
+          }
+
+          const y = targetDate.getFullYear();
+          const m = String(targetDate.getMonth() + 1).padStart(2, '0');
+          const d = String(targetDate.getDate()).padStart(2, '0');
+          const dateStr = `${y}-${m}-${d}`;
+
+          promises.push(api.createBooking({
+            customerName: blockName,
+            email: 'admin@internal',
+            courtType: blockScope,
+            date: dateStr,
+            time: slotTime,
+            status: 'Declined',
+            price: 0,
+            waiverSigned: true
+          } as any));
+        }
+      }
+
+      await Promise.all(promises);
+      await loadSchedule();
+      setSelectedSlots([]);
+      setIsSelectionMode(false);
+      alert(`Successfully blocked ${selectedSlots.length} slots${repeats > 1 ? ` with ${recurrence} recurrence` : ''}.`);
+    } catch (e) {
+      console.error(e);
+      alert("Failed to block selected slots");
     }
   };
 
@@ -286,16 +361,41 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
               </button>
             </div>
           </div>
+
           <div className="flex items-center gap-4">
+            {/* Multi-Select Toggle */}
             <button
-              onClick={() => setShowBlockModal(true)}
-              className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-xl font-black uppercase tracking-widest text-xs shadow-xl shadow-red-600/20 hover:scale-105 transition-all"
+              onClick={() => {
+                setIsSelectionMode(!isSelectionMode);
+                setSelectedSlots([]); // Clear on toggle
+              }}
+              className={`flex items-center gap-2 px-4 py-3 rounded-xl font-black uppercase tracking-widest text-xs transition-all ${isSelectionMode ? 'bg-orange-500 text-white shadow-xl shadow-orange-500/20' : 'bg-white dark:bg-card-dark text-slate-500 border border-slate-200 dark:border-border-dark hover:border-primary hover:text-primary'}`}
             >
-              <span className="material-symbols-outlined text-sm">lock</span>
-              Bulk Block
+              <span className="material-symbols-outlined text-sm">{isSelectionMode ? 'check_box' : 'check_box_outline_blank'}</span>
+              {isSelectionMode ? 'Multi-Select ON' : 'Multi-Select'}
             </button>
+
+            {isSelectionMode && selectedSlots.length > 0 && (
+              <button
+                onClick={handleConfirmSelection}
+                className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-xl font-black uppercase tracking-widest text-xs shadow-xl shadow-green-600/20 hover:scale-105 transition-all animate-in fade-in zoom-in duration-200"
+              >
+                <span className="material-symbols-outlined text-sm">save</span>
+                Confirm Block ({selectedSlots.length})
+              </button>
+            )}
+
+            {!isSelectionMode && (
+              <button
+                onClick={() => setShowBlockModal(true)}
+                className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-xl font-black uppercase tracking-widest text-xs shadow-xl shadow-red-600/20 hover:scale-105 transition-all"
+              >
+                <span className="material-symbols-outlined text-sm">settings</span>
+                Block Settings
+              </button>
+            )}
           </div>
-        </header>
+        </header >
 
         <div className="flex-1 overflow-auto bg-slate-50 dark:bg-background-dark p-6">
           <div className="min-w-[1200px] bg-white dark:bg-card-dark rounded-3xl border border-border-dark shadow-2xl overflow-hidden">
@@ -343,6 +443,13 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
                     let textClass = 'text-slate-500';
                     let borderColor = '';
 
+                    // Selection State
+                    const isSelected = selectedSlots.includes(`${date}|${time}`);
+                    if (isSelected) {
+                      bgClass = 'bg-orange-500/20';
+                      borderColor = 'border-orange-500 border-2 border-dashed';
+                    }
+
                     if (isOccupied) {
                       if (isFullCourt) {
                         bgClass = isConfirmed ? 'bg-green-500/20' : isPending ? 'bg-orange-500/20' : 'bg-red-500/20';
@@ -384,7 +491,7 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
             </div>
           </div>
         </div>
-      </main>
+      </main >
 
       {showBlockModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
@@ -472,51 +579,53 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
         </div>
       )}
 
-      {editingBlock && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setEditingBlock(null)}></div>
-          <div className="relative bg-card-dark border border-border-dark w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="p-6 border-b border-border-dark flex justify-between items-center bg-slate-50/5 dark:bg-card-dark">
-              <div>
-                <h3 className="text-xl font-black uppercase italic tracking-tighter text-white">Manage Block</h3>
-                <p className="text-[10px] text-slate-500 font-bold uppercase mt-0.5">Edit label or remove block</p>
-              </div>
-              <button onClick={() => setEditingBlock(null)} className="size-8 rounded-full border border-border-dark flex items-center justify-center hover:bg-white/5 text-slate-400 hover:text-white transition-colors">
-                <span className="material-symbols-outlined text-lg">close</span>
-              </button>
-            </div>
-
-            <div className="p-6 space-y-6">
-              <div>
-                <label className="text-[10px] font-black uppercase tracking-widest text-primary mb-2 block">Block Label</label>
-                <input
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  placeholder="e.g. Maintenance"
-                  className="w-full bg-background-dark border-border-dark rounded-xl h-12 px-4 text-white font-bold outline-none focus:ring-2 focus:ring-primary placeholder:text-slate-600 text-sm"
-                  autoFocus
-                />
+      {
+        editingBlock && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setEditingBlock(null)}></div>
+            <div className="relative bg-card-dark border border-border-dark w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+              <div className="p-6 border-b border-border-dark flex justify-between items-center bg-slate-50/5 dark:bg-card-dark">
+                <div>
+                  <h3 className="text-xl font-black uppercase italic tracking-tighter text-white">Manage Block</h3>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase mt-0.5">Edit label or remove block</p>
+                </div>
+                <button onClick={() => setEditingBlock(null)} className="size-8 rounded-full border border-border-dark flex items-center justify-center hover:bg-white/5 text-slate-400 hover:text-white transition-colors">
+                  <span className="material-symbols-outlined text-lg">close</span>
+                </button>
               </div>
 
-              <div className="flex flex-col gap-3 pt-2">
-                <button
-                  onClick={handleRename}
-                  className="w-full h-12 bg-primary text-white font-black uppercase tracking-widest rounded-xl shadow-lg shadow-primary/20 hover:bg-orange-600 transition-all text-xs"
-                >
-                  Save Changes
-                </button>
-                <button
-                  onClick={handleUnblock}
-                  className="w-full h-12 border-2 border-red-500/20 text-red-500 font-black uppercase tracking-widest rounded-xl hover:bg-red-500 hover:text-white transition-all text-xs"
-                >
-                  Unblock Slot
-                </button>
+              <div className="p-6 space-y-6">
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-primary mb-2 block">Block Label</label>
+                  <input
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    placeholder="e.g. Maintenance"
+                    className="w-full bg-background-dark border-border-dark rounded-xl h-12 px-4 text-white font-bold outline-none focus:ring-2 focus:ring-primary placeholder:text-slate-600 text-sm"
+                    autoFocus
+                  />
+                </div>
+
+                <div className="flex flex-col gap-3 pt-2">
+                  <button
+                    onClick={handleRename}
+                    className="w-full h-12 bg-primary text-white font-black uppercase tracking-widest rounded-xl shadow-lg shadow-primary/20 hover:bg-orange-600 transition-all text-xs"
+                  >
+                    Save Changes
+                  </button>
+                  <button
+                    onClick={handleUnblock}
+                    className="w-full h-12 border-2 border-red-500/20 text-red-500 font-black uppercase tracking-widest rounded-xl hover:bg-red-500 hover:text-white transition-all text-xs"
+                  >
+                    Unblock Slot
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )
+      }
+    </div >
   );
 };
 
