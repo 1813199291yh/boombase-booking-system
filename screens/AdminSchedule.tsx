@@ -327,10 +327,10 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
                         {isOccupied && (
                           <div
                             className={`absolute inset-1 border border-dashed rounded flex flex-col items-center justify-center opacity-90 p-1 ${borderColor} ${textClass}`}
-                            title={isManualBlock ? 'Facility Block' : `${booking.customerName}\n${booking.email}\n${booking.courtType}`}
+                            title={isManualBlock ? booking.customerName : `${booking.customerName}\n${booking.email}\n${booking.courtType}`}
                           >
                             <span className="text-[9px] font-black uppercase tracking-tight text-center leading-none truncate w-full">
-                              {isManualBlock ? 'BLOCKED' : booking.customerName || 'Guest'}
+                              {booking.customerName || 'Guest'}
                             </span>
                             {!isManualBlock && (
                               <span className="text-[6px] font-bold uppercase tracking-widest opacity-75 mt-0.5">
