@@ -38,7 +38,7 @@ router.post('/login', (req, res) => {
 // Create a booking & Payment Intent
 router.post('/bookings', async (req, res) => {
     try {
-        const { customerName, email, courtType, date, time, price, waiverName, waiverSignature, status, recurringGroupId } = req.body;
+        const { customerName, email, courtType, date, time, price, waiverName, waiverSignature, status, recurringGroupId, color } = req.body;
 
         let stripePaymentId = 'manual-block';
         let bookingStatus = 'Pending Approval';
@@ -73,9 +73,9 @@ router.post('/bookings', async (req, res) => {
                     status: bookingStatus,
                     stripe_payment_id: stripePaymentId,
                     waiver_signed: true,
-                    waiver_name: waiverName,
                     waiver_signature: waiverSignature,
-                    recurring_group_id: recurringGroupId
+                    recurring_group_id: recurringGroupId,
+                    color
                 }
             ])
             .select()
@@ -118,7 +118,8 @@ router.post('/bookings/bulk', async (req, res) => {
             stripe_payment_id: 'manual-bulk-block',
             waiver_signed: b.waiverSigned,
             waiver_name: b.waiverName,
-            recurring_group_id: b.recurringGroupId
+            recurring_group_id: b.recurringGroupId,
+            color: b.color
         }));
 
         // Insert in batches if necessary (Supabase handles batch insert well, but 3000 might need chunking)
@@ -212,6 +213,7 @@ router.post('/bookings/:id/update', async (req, res) => {
         // For simplicity, let's assume we map 'customerName' to 'customer_name'
         const dbUpdates: any = {};
         if (updates.customerName) dbUpdates.customer_name = updates.customerName;
+        if (updates.color) dbUpdates.color = updates.color;
         // Add other fields if needed
 
         if (Object.keys(dbUpdates).length === 0) {
