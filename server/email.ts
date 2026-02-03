@@ -1,12 +1,19 @@
 import nodemailer from 'nodemailer';
 
-const transporter = nodemailer.createTransport({
-    service: 'gmail', // Easy setup for Gmail. Change host/port if using another provider.
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-    },
-});
+const getTransporter = () => {
+    // Lazy load the transporter to ensure process.env is populated
+    if (!(global as any).emailTransporter) {
+        (global as any).emailTransporter = nodemailer.createTransport({
+            service: 'gmail', // Easy setup for Gmail. Change host/port if using another provider.
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS,
+            },
+        });
+    }
+    return (global as any).emailTransporter;
+};
+
 
 export const sendAdminNotification = async (booking: any) => {
     const adminEmail = 'damon@theboombase.com';
@@ -30,7 +37,8 @@ export const sendAdminNotification = async (booking: any) => {
     };
 
     try {
-        await transporter.sendMail(mailOptions);
+        await getTransporter().sendMail(mailOptions);
+
         console.log('Admin notification email sent');
     } catch (error) {
         console.error('Error sending admin email:', error);
@@ -60,7 +68,8 @@ export const sendClientConfirmation = async (booking: any) => {
     };
 
     try {
-        await transporter.sendMail(mailOptions);
+        await getTransporter().sendMail(mailOptions);
+
         console.log('Client confirmation email sent');
     } catch (error) {
         console.error('Error sending client email:', error);
@@ -83,7 +92,8 @@ export const sendClientCancellation = async (booking: any) => {
     };
 
     try {
-        await transporter.sendMail(mailOptions);
+        await getTransporter().sendMail(mailOptions);
+
         console.log('Client cancellation email sent');
     } catch (error) {
         console.error('Error sending client cancellation email:', error);

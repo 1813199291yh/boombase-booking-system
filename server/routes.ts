@@ -42,7 +42,7 @@ router.post('/bookings', async (req, res) => {
 
         let stripePaymentId = 'manual-block';
         let bookingStatus = 'Pending Approval';
-        let clientSecret = null;
+        let clientSecret: string | null = null;
 
         // 1. Create a PaymentIntent with Stripe (ONLY if price > 0)
         if (price > 0) {
@@ -53,7 +53,7 @@ router.post('/bookings', async (req, res) => {
                 automatic_payment_methods: { enabled: true },
             });
             stripePaymentId = paymentIntent.id;
-            clientSecret = paymentIntent.client_secret;
+            clientSecret = paymentIntent.client_secret as string | null;
         } else {
             // Allow status override for Admin Blocks (price 0)
             if (status) bookingStatus = status;
@@ -194,45 +194,4 @@ router.get('/payouts', async (req, res) => {
     }
 });
 
-// Request Payout
-router.post('/payouts/request', async (req, res) => {
-    try {
-        const { amount } = req.body; // Amount to payout
 
-        // 1. Create a Connect Payout (Transfer) in Stripe
-        // NOTE: This requires a connected account ID. 
-        // For this demo, we'll assume a fixed connected account or just simulate it.
-        // In production, you'd store the connected_account_id in the user's profile.
-
-        // Simulating call:
-        // const transfer = await stripe.transfers.create({
-        //   amount: Math.round(amount * 100),
-        //   currency: 'usd',
-        //   destination: 'acct_123456789', // Target connected account
-        // });
-
-        // For demo purposes, we will mock the Stripe response since we don't have a real connected account set up
-        const mockTransferId = `tr_${Math.random().toString(36).substring(7)}`;
-
-        // 2. Record in Supabase
-        const { data, error } = await supabase
-            .from('payouts')
-            .insert([
-                {
-                    amount,
-                    status: 'Processing',
-                    stripe_payout_id: mockTransferId,
-                    created_at: new Date().toISOString() // Explicitly setting if DB default not set
-                }
-            ])
-            .select()
-            .single();
-
-        if (error) throw error;
-
-        res.json({ success: true, payout: data });
-    } catch (error: any) {
-        console.error('Error requesting payout:', error);
-        res.status(500).json({ error: error.message });
-    }
-});

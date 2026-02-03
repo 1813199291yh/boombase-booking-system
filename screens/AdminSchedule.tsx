@@ -104,13 +104,18 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
     const { date, time } = getSlotDateTime(dayIdx, hourIdx);
     const existing = bookings.find(b => b.date === date && b.time === time);
 
-    if (existing) {
+    if (existing && existing.status !== 'Cancelled' && existing.status !== 'Refunded') {
       if (existing.status === 'Confirmed') {
         alert("This slot is booked by a customer. Please reject/cancel it from the Dashboard first.");
         return;
       }
+      if (existing.status === 'Pending Approval') {
+        alert("This slot has a pending request. Please reject/approve it from the Dashboard first.");
+        return;
+      }
       if (existing.status === 'Declined') {
         alert("Unblocking not fully implemented in API yet.");
+        return;
       }
     } else {
       // Create Block
