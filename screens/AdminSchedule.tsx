@@ -14,6 +14,7 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
   const [showBlockModal, setShowBlockModal] = useState(false);
   const [recurrence, setRecurrence] = useState<'One-Time' | 'Weekly' | 'Monthly'>('One-Time');
   const [blockScope, setBlockScope] = useState<CourtType>('Full Court');
+  const [blockLabel, setBlockLabel] = useState('Facility Block');
 
   // Store full booking objects now, not just indices
   const [bookings, setBookings] = useState<any[]>([]);
@@ -147,7 +148,7 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
     } else {
       // Create Block - Ask for Name
       // Default to "Facility Block" but allow edit
-      const blockName = window.prompt("Enter a label for this block:", "Facility Block");
+      const blockName = window.prompt("Enter a label for this block:", blockLabel);
 
       if (!blockName) return; // User cancelled
 
@@ -364,14 +365,13 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
 
             <div className="p-8 space-y-6">
               <div>
-                <label className="text-[10px] font-black uppercase tracking-widest text-primary mb-3 block">Reason for Closure</label>
-                <select className="w-full bg-background-dark border-border-dark rounded-xl h-14 px-4 text-white font-bold outline-none focus:ring-2 focus:ring-primary">
-                  <option>Repeated Booking</option>
-                  <option>Maintenance & Cleaning</option>
-                  <option>Private Event</option>
-                  <option>Team Practice Only</option>
-                  <option>Holiday Closure</option>
-                </select>
+                <label className="text-[10px] font-black uppercase tracking-widest text-primary mb-3 block">Reason for Closure / Block Label</label>
+                <input
+                  value={blockLabel}
+                  onChange={(e) => setBlockLabel(e.target.value)}
+                  placeholder="e.g. Maintenance, Private Event"
+                  className="w-full bg-background-dark border-border-dark rounded-xl h-14 px-4 text-white font-bold outline-none focus:ring-2 focus:ring-primary placeholder:text-slate-600"
+                />
               </div>
 
               <div>
