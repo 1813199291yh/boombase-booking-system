@@ -653,7 +653,9 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
                   >
                     <option value="Does not repeat">Does not repeat</option>
                     <option value="Daily">Daily</option>
-                    <option value="Weekly">Weekly on {new Date().toLocaleDateString('en-US', { weekday: 'long' })}</option>
+                    <option value="Weekly">
+                      Weekly on {selectedSlots.length > 0 ? new Date(selectedSlots[0].split('|')[0] + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long' }) : 'Day'}
+                    </option>
                     <option value="Monthly">Monthly</option>
                     <option value="Every weekday (Mon-Fri)">Every weekday (Mon-Fri)</option>
                     <option value="Infinite">Infinite (3 Years)</option>
