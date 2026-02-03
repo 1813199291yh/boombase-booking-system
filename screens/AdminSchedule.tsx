@@ -16,6 +16,10 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
   const [blockScope, setBlockScope] = useState<CourtType>('Full Court');
   const [blockLabel, setBlockLabel] = useState('Facility Block');
 
+  // Edit Block Modal State
+  const [editingBlock, setEditingBlock] = useState<any>(null);
+  const [editName, setEditName] = useState('');
+
   // Store full booking objects now, not just indices
   const [bookings, setBookings] = useState<any[]>([]);
 
@@ -116,33 +120,10 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
       }
 
       // Handle Blocked Slot (Declined/Facility Block)
+      // Handle Blocked Slot (Declined/Facility Block)
       if (existing.status === 'Declined') {
-        // Offer choice: Unblock or Rename
-        // Since we can't easily show a custom UI without a lot of state, let's use check.
-        const choice = window.confirm(`Manage Block: "${existing.customerName}"\n\nClick OK to UNBLOCK.\nClick Cancel to Rename.`);
-
-        if (choice) {
-          // Unblock -> Cancel
-          try {
-            await api.updateBookingStatus(existing.id, 'Cancelled');
-            await loadSchedule();
-          } catch (e) {
-            console.error(e);
-            alert("Failed to unblock slot");
-          }
-        } else {
-          // Rename -> Prompt
-          const newName = window.prompt("Enter new name for this block:", existing.customerName);
-          if (newName && newName !== existing.customerName) {
-            try {
-              await api.updateBookingDetails(existing.id, { customerName: newName });
-              await loadSchedule();
-            } catch (e) {
-              console.error(e);
-              alert("Failed to rename block");
-            }
-          }
-        }
+        setEditingBlock(existing);
+        setEditName(existing.customerName || '');
         return;
       }
     } else {
@@ -168,6 +149,34 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
         console.error(e);
         alert("Failed to block slot");
       }
+    }
+  };
+
+  const handleUnblock = async () => {
+    if (!editingBlock) return;
+    try {
+      await api.updateBookingStatus(editingBlock.id, 'Cancelled');
+      setEditingBlock(null);
+      await loadSchedule();
+    } catch (e) {
+      console.error(e);
+      alert("Failed to unblock slot");
+    }
+  };
+
+  const handleRename = async () => {
+    if (!editingBlock) return;
+    if (editName && editName !== editingBlock.customerName) {
+      try {
+        await api.updateBookingDetails(editingBlock.id, { customerName: editName });
+        setEditingBlock(null);
+        await loadSchedule();
+      } catch (e) {
+        console.error(e);
+        alert("Failed to rename block");
+      }
+    } else {
+      setEditingBlock(null);
     }
   };
 
@@ -430,6 +439,51 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
               >
                 Confirm Policy
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingBlock && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setEditingBlock(null)}></div>
+          <div className="relative bg-card-dark border border-border-dark w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-border-dark flex justify-between items-center bg-slate-50/5 dark:bg-card-dark">
+              <div>
+                <h3 className="text-xl font-black uppercase italic tracking-tighter text-white">Manage Block</h3>
+                <p className="text-[10px] text-slate-500 font-bold uppercase mt-0.5">Edit label or remove block</p>
+              </div>
+              <button onClick={() => setEditingBlock(null)} className="size-8 rounded-full border border-border-dark flex items-center justify-center hover:bg-white/5 text-slate-400 hover:text-white transition-colors">
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-primary mb-2 block">Block Label</label>
+                <input
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="e.g. Maintenance"
+                  className="w-full bg-background-dark border-border-dark rounded-xl h-12 px-4 text-white font-bold outline-none focus:ring-2 focus:ring-primary placeholder:text-slate-600 text-sm"
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex flex-col gap-3 pt-2">
+                <button
+                  onClick={handleRename}
+                  className="w-full h-12 bg-primary text-white font-black uppercase tracking-widest rounded-xl shadow-lg shadow-primary/20 hover:bg-orange-600 transition-all text-xs"
+                >
+                  Save Changes
+                </button>
+                <button
+                  onClick={handleUnblock}
+                  className="w-full h-12 border-2 border-red-500/20 text-red-500 font-black uppercase tracking-widest rounded-xl hover:bg-red-500 hover:text-white transition-all text-xs"
+                >
+                  Unblock Slot
+                </button>
+              </div>
             </div>
           </div>
         </div>
