@@ -17,7 +17,10 @@ import { api } from './src/api';
 // ... (other imports)
 
 const App: React.FC = () => {
-  const [currentScreen, setCurrentScreen] = useState<ScreenType>(ScreenType.LANDING);
+  const [currentScreen, setCurrentScreen] = useState<ScreenType>(() => {
+    const saved = localStorage.getItem('currentScreen');
+    return (saved as ScreenType) || ScreenType.LANDING;
+  });
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [bookings, setBookings] = useState<Booking[]>([]);
 
@@ -61,8 +64,10 @@ const App: React.FC = () => {
 
     if (adminScreens.includes(screen) && !isAuthenticated) {
       setCurrentScreen(ScreenType.ADMIN_LOGIN);
+      localStorage.setItem('currentScreen', ScreenType.ADMIN_LOGIN);
     } else {
       setCurrentScreen(screen);
+      localStorage.setItem('currentScreen', screen);
     }
     window.scrollTo(0, 0);
   };
@@ -72,12 +77,14 @@ const App: React.FC = () => {
       setIsAuthenticated(true);
       localStorage.setItem('isAdmin', 'true');
       setCurrentScreen(ScreenType.ADMIN_DASHBOARD);
+      localStorage.setItem('currentScreen', ScreenType.ADMIN_DASHBOARD);
     }
   };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
     localStorage.removeItem('isAdmin');
+    localStorage.removeItem('currentScreen');
     setCurrentScreen(ScreenType.LANDING);
   };
 

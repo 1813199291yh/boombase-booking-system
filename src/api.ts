@@ -68,6 +68,16 @@ export const api = {
         return response.json();
     },
 
+    updateBookingSeries: async (groupId: string, updates: any, mode: 'future' | 'all', currentDate?: string) => {
+        const response = await fetch(`${API_URL}/bookings/update-series`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ groupId, updates, mode, currentDate }),
+        });
+        if (!response.ok) throw new Error('Failed to update booking series');
+        return response.json();
+    },
+
     deleteBookingSeries: async (groupId: string) => {
         const response = await fetch(`${API_URL}/bookings/delete-series`, {
             method: 'POST',

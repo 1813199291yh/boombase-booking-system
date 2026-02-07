@@ -22,6 +22,7 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
   const [editingBlock, setEditingBlock] = useState<any>(null);
   const [editName, setEditName] = useState('');
   const [showDeleteOptions, setShowDeleteOptions] = useState(false); // Toggle for single vs series delete UI
+  const [showUpdateOptions, setShowUpdateOptions] = useState(false); // Toggle for single vs series update UI
 
   // Color Palette
   const COLORS = [
@@ -194,6 +195,8 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
         setEditingBlock(existing);
         setEditName(existing.customerName || '');
         setEditColor(existing.color || COLORS[0].value);
+        setShowDeleteOptions(false); // Reset
+        setShowUpdateOptions(false); // Reset
         return;
       }
     } else {
@@ -205,7 +208,7 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
 
       // Determine number of repeats
       let repeats = 1;
-      if (recurrence === 'Weekly') repeats = 12; // 3 months approx
+      if (recurrence === 'Weekly') repeats = 52; // 1 year
       if (recurrence === 'Monthly') repeats = 12; // 1 year
 
       try {
@@ -322,6 +325,9 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
           } else if (recurrence === 'Monthly') {
             currentDate.setMonth(currentDate.getMonth() + 1);
           }
+          // FIX: Create new Date object to avoid reference issues if date was not mutated correctly above (though setDate mutates in place)
+          // However, to be safe and clear:
+          currentDate = new Date(currentDate);
         }
       }
 
@@ -384,6 +390,29 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
     }
   };
 
+  const handleUpdateSeries = async (mode: 'future' | 'all') => {
+    if (!editingBlock || !editingBlock.recurringGroupId) return;
+
+    try {
+      await api.updateBookingSeries(
+        editingBlock.recurringGroupId,
+        {
+          customerName: editName,
+          color: editColor
+        },
+        mode,
+        editingBlock.date // Pass current date for 'future' mode
+      );
+
+      setEditingBlock(null);
+      setShowUpdateOptions(false);
+      await loadSchedule();
+    } catch (e) {
+      console.error(e);
+      alert("Failed to update series");
+    }
+  };
+
   // Drag Handlers
   const handleSlotMouseDown = (dayIdx: number, hourIdx: number) => {
     if (!isSelectionMode) return;
@@ -427,6 +456,12 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
     const hasColorChange = editColor && editColor !== editingBlock.color;
 
     if (hasNameChange || hasColorChange) {
+      // Check if it's a recurring series
+      if (editingBlock.recurringGroupId) {
+        setShowUpdateOptions(true);
+        return;
+      }
+
       try {
         await api.updateBookingDetails(editingBlock.id, {
           customerName: editName,
@@ -815,7 +850,7 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
               </div>
 
               <div className="p-6 space-y-6">
-                {!showDeleteOptions ? (
+                {!showDeleteOptions && !showUpdateOptions ? (
                   <>
                     <div>
                       <label className="text-[10px] font-black uppercase tracking-widest text-primary mb-2 block">Block Label</label>
@@ -860,6 +895,56 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
                       </button>
                     </div>
                   </>
+                ) : showUpdateOptions ? (
+                  <div className="animate-in fade-in slide-in-from-right-4 duration-200">
+                    <div className="flex items-center gap-3 mb-6 bg-blue-500/10 p-4 rounded-xl border border-blue-500/20 text-blue-400">
+                      <span className="material-symbols-outlined text-2xl">update</span>
+                      <div className="text-xs font-medium leading-relaxed">
+                        This is a recurring event. <br />
+                        How would you like to apply these changes?
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-3">
+                      <button
+                        onClick={async () => {
+                          try {
+                            await api.updateBookingDetails(editingBlock.id, {
+                              customerName: editName,
+                              color: editColor
+                            });
+                            setEditingBlock(null);
+                            setShowUpdateOptions(false);
+                            await loadSchedule();
+                          } catch (e) {
+                            console.error(e);
+                            alert("Failed to update block");
+                          }
+                        }}
+                        className="w-full h-12 bg-white text-slate-800 font-black uppercase tracking-widest rounded-xl hover:bg-slate-200 transition-all text-xs"
+                      >
+                        This Event Only
+                      </button>
+                      <button
+                        onClick={() => handleUpdateSeries('future')}
+                        className="w-full h-12 bg-blue-600 text-white font-black uppercase tracking-widest rounded-xl shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all text-xs"
+                      >
+                        This and Following Events
+                      </button>
+                      <button
+                        onClick={() => handleUpdateSeries('all')}
+                        className="w-full h-12 border-2 border-slate-700 text-slate-400 font-black uppercase tracking-widest rounded-xl hover:border-slate-500 hover:text-white transition-all text-xs"
+                      >
+                        All Events
+                      </button>
+                      <button
+                        onClick={() => setShowUpdateOptions(false)}
+                        className="w-full h-10 text-slate-500 font-bold uppercase tracking-widest hover:text-white transition-all text-[10px] mt-2"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
                 ) : (
                   <div className="animate-in fade-in slide-in-from-right-4 duration-200">
                     <div className="flex items-center gap-3 mb-6 bg-red-500/10 p-4 rounded-xl border border-red-500/20 text-red-400">
@@ -892,6 +977,7 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
                     </div>
                   </div>
                 )}
+
               </div>
             </div>
           </div>

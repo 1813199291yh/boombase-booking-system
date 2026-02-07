@@ -146,7 +146,9 @@ const mapBooking = (b: any) => ({
     stripePaymentId: b.stripe_payment_id,
     waiverSigned: b.waiver_signed,
     waiverName: b.waiver_name,
-    waiverSignature: b.waiver_signature
+    waiverSignature: b.waiver_signature,
+    recurringGroupId: b.recurring_group_id, // Ensure consistent camelCase for frontend
+    color: b.color // explicit pass-through (though ...b handles it)
 });
 
 // Get Bookings
@@ -203,6 +205,7 @@ router.post('/bookings/:id/status', async (req, res) => {
     }
 });
 
+
 // Update booking details (e.g. rename)
 router.post('/bookings/:id/update', async (req, res) => {
     try {
@@ -234,6 +237,42 @@ router.post('/bookings/:id/update', async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+
+// Update Booking Series
+router.post('/bookings/update-series', async (req, res) => {
+    try {
+        const { groupId, updates, mode, currentDate } = req.body;
+
+        if (!groupId) return res.status(400).json({ error: 'Missing groupId' });
+        if (!updates) return res.status(400).json({ error: 'Missing updates' });
+
+        const dbUpdates: any = {};
+        if (updates.customerName) dbUpdates.customer_name = updates.customerName;
+        if (updates.color) dbUpdates.color = updates.color;
+
+        if (Object.keys(dbUpdates).length === 0) {
+            return res.status(400).json({ error: 'No valid fields to update' });
+        }
+
+        let query = supabase.from('bookings').update(dbUpdates).eq('recurring_group_id', groupId);
+
+        if (mode === 'future' && currentDate) {
+            // Update this and future events
+            query = query.gte('date', currentDate);
+        }
+
+        const { data, error } = await query.select();
+
+        if (error) throw error;
+
+        // Return count or success
+        res.json({ success: true, count: data.length, updated: data.map(mapBooking) });
+    } catch (error: any) {
+        console.error('Error updating series:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 
 // Delete Booking Series
 router.post('/bookings/delete-series', async (req, res) => {
