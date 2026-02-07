@@ -45,7 +45,7 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
 
   // Drag State
   const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState<{ day: number, hour: number } | null>(null);
+  const [dragStart, setDragStart] = useState<{ day: number, hour: number, min: number } | null>(null);
 
   // Store full booking objects now, not just indices
   const [bookings, setBookings] = useState<any[]>([]);
@@ -110,19 +110,8 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
     }
   };
 
-  const generateTimeSlots = () => {
-    const slots = [];
-    for (let hour = 6; hour <= 23; hour++) {
-      for (let min of ["00", "30"]) {
-        let displayHour = hour > 12 ? hour - 12 : hour;
-        let period = hour >= 12 ? "PM" : "AM";
-        slots.push(`${displayHour.toString().padStart(2, '0')}:${min} ${period}`);
-      }
-    }
-    return slots;
-  };
-
-  const hours = generateTimeSlots();
+  // Generate hours 6-23 (numbers)
+  const hourRows = Array.from({ length: 18 }, (_, i) => 6 + i);
 
   // Generate the 7 days headers based on currentWeekStart
   const days = Array.from({ length: 7 }).map((_, i) => {
@@ -134,35 +123,27 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
   });
 
   // Helper to map grid index to DateTime
-  const getSlotDateTime = (dayIdx: number, slotIdx: number) => {
+  const getSlotDateTime = (dayIdx: number, hour: number, min: number) => {
     const d = new Date(currentWeekStart);
     d.setDate(d.getDate() + dayIdx);
 
-    // Use Local Time for string, not UTC
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     const dateStr = `${year}-${month}-${day}`;
 
-    // Fix: Calculate hour starting from 6 AM
-    // slotIdx 0 -> 6:00 AM
-    // slotIdx 1 -> 6:30 AM
-    // hour = 6 + floor(idx / 2)
-    const hour = 6 + Math.floor(slotIdx / 2);
-    const min = (slotIdx % 2) === 0 ? '00' : '30';
-
+    // Construct time string
     let displayHour = hour > 12 ? hour - 12 : hour;
     let period = hour >= 12 ? "PM" : "AM";
-    const timeStr = `${displayHour.toString().padStart(2, '0')}:${min} ${period}`;
+    const minStr = min === 0 ? '00' : '30';
+    const timeStr = `${displayHour.toString().padStart(2, '0')}:${minStr} ${period}`;
 
     return { date: dateStr, time: timeStr };
   };
 
 
-
-
-  const handleBlockSlot = async (dayIdx: number, hourIdx: number) => {
-    const { date, time } = getSlotDateTime(dayIdx, hourIdx);
+  const handleBlockSlot = async (dayIdx: number, hour: number, min: number) => {
+    const { date, time } = getSlotDateTime(dayIdx, hour, min);
 
     // Handles Multi-Select Mode
     if (isSelectionMode) {
@@ -177,8 +158,6 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
 
     const existing = bookings.find(b => b.date === date && b.time === time);
 
-
-
     if (existing && existing.status !== 'Cancelled' && existing.status !== 'Refunded') {
       if (existing.status === 'Confirmed') {
         alert("This slot is booked by a customer. Please reject/cancel it from the Dashboard first.");
@@ -190,7 +169,6 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
       }
 
       // Handle Blocked Slot (Declined/Facility Block)
-      // Handle Blocked Slot (Declined/Facility Block)
       if (existing.status === 'Declined') {
         setEditingBlock(existing);
         setEditName(existing.customerName || '');
@@ -200,7 +178,7 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
         return;
       }
     } else {
-      // Create Block - Open Modal instead of prompt to allow color selection
+      // Create Block-Open Modal instead of prompt to allow color selection
       const slotKey = `${date}|${time}`;
       setSelectedSlots([slotKey]);
       setShowBlockModal(true);
@@ -368,36 +346,29 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
   };
 
   // Drag Handlers
-  const handleSlotMouseDown = (dayIdx: number, hourIdx: number) => {
+  const handleSlotMouseDown = (dayIdx: number, hour: number, min: number) => {
     if (!isSelectionMode) return;
     setIsDragging(true);
-    setDragStart({ day: dayIdx, hour: hourIdx });
-    const { date, time } = getSlotDateTime(dayIdx, hourIdx);
+    // Store as flat comparable value: day * 1440 + hour * 60 + min
+    setDragStart({ day: dayIdx, hour, min });
+    const { date, time } = getSlotDateTime(dayIdx, hour, min);
     const slotKey = `${date}|${time}`;
     if (!selectedSlots.includes(slotKey)) {
       setSelectedSlots([...selectedSlots, slotKey]);
     }
   };
 
-  const handleSlotMouseEnter = (dayIdx: number, hourIdx: number) => {
+  const handleSlotMouseEnter = (dayIdx: number, hour: number, min: number) => {
     if (!isSelectionMode || !isDragging || !dragStart) return;
 
-    // Calculate range
-    const minDay = Math.min(dragStart.day, dayIdx);
-    const maxDay = Math.max(dragStart.day, dayIdx);
-    const minHour = Math.min(dragStart.hour, hourIdx);
-    const maxHour = Math.max(dragStart.hour, hourIdx); // Corrected property access
-
-    const newSlots = new Set(selectedSlots);
-
-    for (let d = minDay; d <= maxDay; d++) {
-      for (let h = minHour; h <= maxHour; h++) {
-        const { date, time } = getSlotDateTime(d, h);
-        newSlots.add(`${date}|${time}`);
-      }
+    // Drag-to-paint logic
+    const { date, time } = getSlotDateTime(dayIdx, hour, min);
+    const slotKey = `${date}|${time}`;
+    if (!selectedSlots.includes(slotKey)) {
+      setSelectedSlots([...selectedSlots, slotKey]);
     }
-    setSelectedSlots(Array.from(newSlots));
   };
+
 
   const handleMouseUp = () => {
     setIsDragging(false);
@@ -552,7 +523,8 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
                 setIsSelectionMode(!isSelectionMode);
                 setSelectedSlots([]); // Clear on toggle
               }}
-              className={`flex items-center gap-2 px-4 py-3 rounded-xl font-black uppercase tracking-widest text-xs transition-all ${isSelectionMode ? 'bg-orange-500 text-white shadow-xl shadow-orange-500/20' : 'bg-white dark:bg-card-dark text-slate-500 border border-slate-200 dark:border-border-dark hover:border-primary hover:text-primary'}`}
+              className={`flex items-center gap-2 px-4 py-3 rounded-xl font-black uppercase tracking-widest text-xs transition-all ${isSelectionMode ? 'bg-orange-500 text-white shadow-xl shadow-orange-500/20' : 'bg-white dark:bg-card-dark text-slate-500 border border-slate-200 dark:border-border-dark hover:border-primary hover:text-primary'} `
+              }
             >
               <span className="material-symbols-outlined text-sm">{isSelectionMode ? 'check_box' : 'check_box_outline_blank'}</span>
               {isSelectionMode ? 'Multi-Select ON' : 'Multi-Select'}
@@ -605,88 +577,97 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
             </div>
 
             <div className="relative">
-              {hours.map((hour, hIdx) => (
-                <div key={hIdx} className="grid grid-cols-[100px_repeat(7,1fr)] h-12 border-b border-border-dark/50">
-                  <div className="flex items-center justify-center text-[9px] font-black text-slate-500 uppercase tracking-widest border-r border-border-dark">{hour}</div>
-                  {days.map((_, dIdx) => {
-                    const { date, time } = getSlotDateTime(dIdx, hIdx);
-                    // Find a booking/block for this slot
-                    const booking = bookings.find(b => b.date === date && b.time === time);
+              <div className="relative">
+                {hourRows.map((hour) => {
+                  let displayHour = hour > 12 ? hour - 12 : hour;
+                  let period = hour >= 12 ? "PM" : "AM";
+                  const label = `${displayHour}${period} `;
 
-                    const isOccupied = booking && (booking.status === 'Confirmed' || booking.status === 'Declined' || booking.status === 'Pending Approval');
-                    const isConfirmed = booking?.status === 'Confirmed';
-                    const isManualBlock = booking?.customerName === 'Facility Block' || booking?.status === 'Declined';
-                    const isPending = booking?.status === 'Pending Approval';
-
-                    const isFullCourt = booking?.courtType === 'Full Court';
-
-                    // Visuals
-                    let bgClass = 'hover:bg-primary/5';
-                    let borderClass = 'border-l border-border-dark';
-                    let textClass = 'text-slate-500';
-                    let borderColor = '';
-
-                    // Selection State
-                    const isSelected = selectedSlots.includes(`${date}|${time}`);
-                    if (isSelected) {
-                      bgClass = 'bg-orange-500/20';
-                      borderColor = 'border-orange-500 border-2 border-dashed';
-                    }
-
-                    if (isOccupied) {
-                      if (isFullCourt) {
-                        bgClass = isConfirmed ? 'bg-green-500/20' : isPending ? 'bg-orange-500/20' : 'bg-red-500/20';
-                        textClass = isConfirmed ? 'text-green-600' : isPending ? 'text-orange-500' : 'text-red-500';
-                        borderColor = isConfirmed ? 'border-green-500/30' : isPending ? 'border-orange-500/30' : 'border-red-500/30';
-                      } else {
-                        bgClass = isConfirmed ? 'bg-blue-500/20' : isPending ? 'bg-blue-300/20' : 'bg-blue-500/10';
-                        textClass = 'text-blue-500';
-                        borderColor = 'border-blue-500/30';
-                      }
-
-                      // Custom Color Override for Blocks (Declined/Facility Block)
-                      if (isManualBlock && booking.color) {
-                        const c = booking.color;
-                        // Apply style directly via style prop for custom colors
-                        // We will leave classes empty/neutral to let style take over
-                        bgClass = ``;
-                        textClass = `text-white`;
-                        borderColor = `border-white/20`;
-                      }
-                    }
-
-                    return (
-                      <div
-                        key={dIdx}
-                        onMouseDown={() => {
-                          if (isSelectionMode) handleSlotMouseDown(dIdx, hIdx);
-                          else handleBlockSlot(dIdx, hIdx);
-                        }}
-                        onMouseEnter={() => handleSlotMouseEnter(dIdx, hIdx)}
-                        onClick={() => !isSelectionMode && handleBlockSlot(dIdx, hIdx)}
-                        className={`${borderClass} relative group transition-all cursor-pointer overflow-hidden ${bgClass}`}
-                        style={isManualBlock && booking?.color ? { backgroundColor: booking.color } : {}}
-                      >
-                        {isOccupied && (
-                          <div
-                            className={`absolute inset-1 border border-dashed rounded flex flex-col items-center justify-center opacity-90 p-1 ${borderColor} ${textClass}`}
-                            title={isManualBlock ? booking.customerName : `${booking.customerName}\n${booking.email}\n${booking.courtType}`}
-                          >
-                            <span className="text-[9px] font-black uppercase tracking-tight text-center leading-none truncate w-full">
-                              {booking.customerName || 'Guest'}
-                            </span>
-                            {!isManualBlock && (
-                              <span className="text-[6px] font-bold uppercase tracking-widest opacity-75 mt-0.5">
-                                {booking.courtType === 'Full Court' ? 'FULL' : 'HALF'}
-                              </span>
-                            )}
-                          </div>
-                        )}
+                  return (
+                    <div key={hour} className="grid grid-cols-[100px_repeat(7,1fr)] h-24 border-b border-border-dark/50">
+                      {/* Hour Label-Vertically centered or top aligned? Google uses top-0.5em */}
+                      <div className="flex justify-center pt-2 text-[10px] font-black text-slate-500 uppercase tracking-widest border-r border-border-dark relative">
+                        <span className="-mt-3 bg-white dark:bg-card-dark px-1">{label}</span>
                       </div>
-                    );
-                  })}
-                </div>
-              ))}
+
+                      {days.map((_, dIdx) => (
+                        <div key={dIdx} className="border-l border-border-dark flex flex-col h-full relative group-day">
+                          {/* Loop for 00 and 30 */}
+                          {[0, 30].map((min) => {
+                            const { date, time } = getSlotDateTime(dIdx, hour, min);
+                            const booking = bookings.find(b => b.date === date && b.time === time);
+
+                            const isOccupied = booking && (booking.status === 'Confirmed' || booking.status === 'Declined' || booking.status === 'Pending Approval');
+                            const isConfirmed = booking?.status === 'Confirmed';
+                            const isManualBlock = booking?.customerName === 'Facility Block' || booking?.status === 'Declined';
+                            const isPending = booking?.status === 'Pending Approval';
+                            const isFullCourt = booking?.courtType === 'Full Court';
+
+                            let bgClass = 'hover:bg-primary/5';
+                            let borderClass = min === 0 ? 'border-b border-border-dark/10' : ''; // faint divider
+                            let textClass = 'text-slate-500';
+                            let borderColor = '';
+
+                            const isSelected = selectedSlots.includes(`${date}| ${time} `);
+                            if (isSelected) {
+                              bgClass = 'bg-orange-500/20';
+                              borderColor = 'border-orange-500 border-2 border-dashed';
+                            }
+
+                            if (isOccupied) {
+                              if (isFullCourt) {
+                                bgClass = isConfirmed ? 'bg-green-500/20' : isPending ? 'bg-orange-500/20' : 'bg-red-500/20';
+                                textClass = isConfirmed ? 'text-green-600' : isPending ? 'text-orange-500' : 'text-red-500';
+                                borderColor = isConfirmed ? 'border-green-500/30' : isPending ? 'border-orange-500/30' : 'border-red-500/30';
+                              } else {
+                                bgClass = isConfirmed ? 'bg-blue-500/20' : isPending ? 'bg-blue-300/20' : 'bg-blue-500/10';
+                                textClass = 'text-blue-500';
+                                borderColor = 'border-blue-500/30';
+                              }
+
+                              if (isManualBlock && booking.color) {
+                                bgClass = ``;
+                                textClass = `text-white`;
+                                borderColor = `border-white / 20`;
+                              }
+                            }
+
+                            return (
+                              <div
+                                key={min}
+                                onMouseDown={() => {
+                                  if (isSelectionMode) handleSlotMouseDown(dIdx, hour, min);
+                                  else handleBlockSlot(dIdx, hour, min);
+                                }}
+                                onMouseEnter={() => handleSlotMouseEnter(dIdx, hour, min)}
+                                onClick={() => !isSelectionMode && handleBlockSlot(dIdx, hour, min)}
+                                className={`flex-1 relative group w-full transition-all cursor-pointer overflow-hidden ${bgClass}${borderClass} `}
+                                style={isManualBlock && booking?.color ? { backgroundColor: booking.color } : {}}
+                              >
+                                {isOccupied && (
+                                  <div
+                                    className={`absolute inset-1 border border-dashed rounded flex flex-col items-center justify-center opacity-90 p-1 ${borderColor}${textClass} `}
+                                    title={isManualBlock ? booking.customerName : `${booking.customerName} \n${booking.email} \n${booking.courtType} `}
+                                  >
+                                    <span className="text-[9px] font-black uppercase tracking-tight text-center leading-none truncate w-full">
+                                      {booking.customerName || 'Guest'}
+                                    </span>
+                                    {!isManualBlock && (
+                                      <span className="text-[6px] font-bold uppercase tracking-widest opacity-75 mt-0.5">
+                                        {booking.courtType === 'Full Court' ? 'FULL' : 'HALF'}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
@@ -722,8 +703,7 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
                     <span className="font-medium mr-2">
                       {selectedSlots.length > 0
                         ? new Date(selectedSlots[0].split('|')[0]).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
-                        : 'Select date'
-                      }
+                        : 'Select date'}
                     </span>
                     <span>• {selectedSlots.length} slots selected</span>
                   </div>
@@ -755,13 +735,13 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
                   <div className="flex gap-2">
                     <button
                       onClick={() => setBlockScope('Full Court')}
-                      className={`px-3 py-1.5 rounded text-xs font-bold transition-colors border ${blockScope === 'Full Court' ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}
+                      className={`px-3 py-1.5 rounded text-xs font-bold transition-colors border ${blockScope === 'Full Court' ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'} `}
                     >
                       Full Court
                     </button>
                     <button
                       onClick={() => setBlockScope('Half Court')}
-                      className={`px-3 py-1.5 rounded text-xs font-bold transition-colors border ${blockScope === 'Half Court' ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}
+                      className={`px-3 py-1.5 rounded text-xs font-bold transition-colors border ${blockScope === 'Half Court' ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'} `}
                     >
                       Half Court
                     </button>
@@ -778,7 +758,7 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
                       key={c.value}
                       title={c.label}
                       onClick={() => setSelectedColor(c.value)}
-                      className={`size-8 rounded-full transition-transform hover:scale-110 ${selectedColor === c.value ? 'ring-2 ring-offset-2 ring-primary scale-110' : ''}`}
+                      className={`size-8 rounded-full transition-transform hover: scale-110 ${selectedColor === c.value ? 'ring-2 ring-offset-2 ring-primary scale-110' : ''} `}
                       style={{ backgroundColor: c.value }}
                     />
                   ))}
@@ -843,7 +823,7 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
                             key={c.value}
                             title={c.label}
                             onClick={() => setEditColor(c.value)}
-                            className={`size-8 rounded-full transition-transform hover:scale-110 ${editColor === c.value ? 'ring-2 ring-offset-2 ring-primary scale-110' : ''}`}
+                            className={`size-8 rounded-full transition-transform hover: scale-110 ${editColor === c.value ? 'ring-2 ring-offset-2 ring-primary scale-110' : ''} `}
                             style={{ backgroundColor: c.value }}
                           />
                         ))}
@@ -952,8 +932,7 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
               </div>
             </div>
           </div>
-        )
-      }
+        )}
     </div >
   );
 };
