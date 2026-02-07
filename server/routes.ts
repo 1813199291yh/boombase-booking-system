@@ -102,7 +102,10 @@ router.post('/bookings', async (req, res) => {
 router.post('/bookings/bulk', async (req, res) => {
     try {
         const { bookings } = req.body;
+        console.log(`[Bulk Create] Received ${bookings?.length} bookings`);
+
         if (!bookings || !Array.isArray(bookings) || bookings.length === 0) {
+            console.error('[Bulk Create] Invalid bookings array');
             return res.status(400).json({ error: 'Invalid bookings array' });
         }
 
@@ -129,8 +132,12 @@ router.post('/bookings/bulk', async (req, res) => {
             .insert(dbBookings)
             .select();
 
-        if (error) throw error;
+        if (error) {
+            console.error('[Bulk Create] Supabase Error:', error);
+            throw error;
+        }
 
+        console.log(`[Bulk Create] Successfully inserted ${data?.length} rows`);
         res.json({ success: true, count: data.length });
     } catch (error: any) {
         console.error('Error bulk creating bookings:', error);
@@ -165,9 +172,24 @@ router.get('/bookings', async (req, res) => {
             query = query.lte('date', end);
         }
 
+        // Explicitly sort by created_at DESC to ensure new bookings appear even if limit is hit
+        query = query.order('created_at', { ascending: false });
+
+        // Increase default limit (Supabase default is 1000)
+        // Use range() to be explicit
+        query = query.range(0, 9999);
+
+        // Sort by date DESC so we see newest if limit is hit?
+        // Actually, for schedule we want ascending? Or just date.
+        // If we want new bookings to appear even if past ones fill limit, we should filter past out?
+        // But for now, sheer volume:
+        console.log(`[API] Fetching bookings (start: ${start}, end: ${end}) with limit 10000`);
+
         const { data, error } = await query;
 
         if (error) throw error;
+
+        console.log(`[API] Returned ${data?.length} bookings`);
 
         // Map to frontend structure
         const bookings = data.map(mapBooking);
