@@ -32,7 +32,11 @@ export const api = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ bookings }),
         });
-        if (!response.ok) throw new Error('Failed to create bookings');
+        if (!response.ok) {
+            const errText = await response.text();
+            console.error('[API] createBookingsBulk failed:', errText);
+            throw new Error(`Failed to create bookings: ${errText}`);
+        }
         return response.json();
     },
 

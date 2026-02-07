@@ -200,66 +200,20 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
         return;
       }
     } else {
-      // Create Block - Ask for Name
-      // Default to "Facility Block" but allow edit
-      const blockName = window.prompt("Enter a label for this block:", blockLabel);
-
-      if (!blockName) return; // User cancelled
-
-      // Determine number of repeats
-      let repeats = 1;
-      if (recurrence === 'Weekly') repeats = 52; // 1 year
-      if (recurrence === 'Monthly') repeats = 12; // 1 year
-
-      try {
-        const promises = [];
-        const baseDate = new Date(date + 'T00:00:00'); // Ensure correct date parsing
-
-        for (let i = 0; i < repeats; i++) {
-          let targetDate = new Date(baseDate);
-
-          if (recurrence === 'Weekly') {
-            targetDate.setDate(baseDate.getDate() + (i * 7));
-          } else if (recurrence === 'Monthly') {
-            targetDate.setMonth(baseDate.getMonth() + i);
-          }
-          // For One-Time, i=0, so it stays baseDate
-
-          // Format back to YYYY-MM-DD
-          const y = targetDate.getFullYear();
-          const m = String(targetDate.getMonth() + 1).padStart(2, '0');
-          const d = String(targetDate.getDate()).padStart(2, '0');
-          const dateStr = `${y}-${m}-${d}`;
-
-          promises.push(api.createBooking({
-            customerName: blockName,
-            email: 'admin@internal',
-            courtType: blockScope,
-            date: dateStr,
-            time: time,
-            status: 'Declined', // Using 'Declined' as 'Block'
-            price: 0,
-            waiverSigned: true,
-            color: selectedColor
-          } as any));
-        }
-
-        await Promise.all(promises);
-        await loadSchedule();
-        alert(`Successfully created ${repeats} block(s).`);
-      } catch (e) {
-        console.error(e);
-        alert("Failed to block slot(s)");
-      }
+      // Create Block - Open Modal instead of prompt to allow color selection
+      const slotKey = `${date}|${time}`;
+      setSelectedSlots([slotKey]);
+      setShowBlockModal(true);
     }
   };
 
   const handleConfirmSelection = async () => {
     if (selectedSlots.length === 0) return;
 
-    // Ask for label one last time or use default
-    const blockName = window.prompt(`Blocking ${selectedSlots.length} slots. Enter label:`, blockLabel);
-    if (!blockName) return;
+    // Use label from modal input, default to "Facility Block" if empty
+    const finalBlockName = blockLabel || "Facility Block";
+    // Optional: Validate if they really want to proceed without a specific name?
+    // But "Facility Block" is a fine default.
 
     // Determine number of repeats per slot
     let repeats = 1;
@@ -300,7 +254,7 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
             const dateStr = `${y}-${m}-${d}`;
 
             bookingsBatch.push({
-              customerName: blockName || 'Closed',
+              customerName: finalBlockName,
               email: 'admin@internal',
               courtType: blockScope,
               date: dateStr,
@@ -337,9 +291,9 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
       setIsSelectionMode(false);
       setShowBlockModal(false); // Close modal after confirming
       alert(`Successfully blocked ${selectedSlots.length} slots${repeats > 1 ? ` with ${recurrence} recurrence` : ''}.`);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      alert("Failed to block selected slots");
+      alert(`Failed to block selected slots: ${e.message}`);
     }
   };
 
@@ -814,6 +768,23 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
                   </div>
                 </div>
               </div>
+
+              {/* Color Picker (Create Modal) */}
+              <div className="mt-6">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Block Color</label>
+                <div className="flex gap-2 flex-wrap">
+                  {COLORS.map((c) => (
+                    <button
+                      key={c.value}
+                      title={c.label}
+                      onClick={() => setSelectedColor(c.value)}
+                      className={`size-8 rounded-full transition-transform hover:scale-110 ${selectedColor === c.value ? 'ring-2 ring-offset-2 ring-primary scale-110' : ''}`}
+                      style={{ backgroundColor: c.value }}
+                    />
+                  ))}
+                </div>
+              </div>
+
             </div>
 
             <div className="px-6 py-4 flex justify-end gap-3 border-t border-slate-100 dark:border-border-dark mt-4">
