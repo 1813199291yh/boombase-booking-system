@@ -40,7 +40,7 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
   const [editColor, setEditColor] = useState(COLORS[0].value);
 
   // Multi-Select State
-  const [isSelectionMode, setIsSelectionMode] = useState(false);
+
   const [selectedSlots, setSelectedSlots] = useState<string[]>([]); // Format: "YYYY-MM-DD|HH:mm PM"
 
   // Drag State
@@ -145,16 +145,14 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
   const handleBlockSlot = async (dayIdx: number, hour: number, min: number) => {
     const { date, time } = getSlotDateTime(dayIdx, hour, min);
 
-    // Handles Multi-Select Mode
-    if (isSelectionMode) {
-      const slotKey = `${date}|${time}`;
-      if (selectedSlots.includes(slotKey)) {
-        setSelectedSlots(selectedSlots.filter(s => s !== slotKey));
-      } else {
-        setSelectedSlots([...selectedSlots, slotKey]);
-      }
-      return;
+    // Handles Multi-Select Mode (Now Default)
+    const slotKey = `${date}|${time}`;
+    if (selectedSlots.includes(slotKey)) {
+      setSelectedSlots(selectedSlots.filter(s => s !== slotKey));
+    } else {
+      setSelectedSlots([...selectedSlots, slotKey]);
     }
+    return;
 
     const existing = bookings.find(b => b.date === date && b.time === time);
 
@@ -266,7 +264,7 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
       await api.createBookingsBulk(bookingsBatch);
       await loadSchedule();
       setSelectedSlots([]);
-      setIsSelectionMode(false);
+
       setShowBlockModal(false); // Close modal after confirming
       alert(`Successfully blocked ${selectedSlots.length} slots${repeats > 1 ? ` with ${recurrence} recurrence` : ''}.`);
     } catch (e: any) {
@@ -346,20 +344,22 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
   };
 
   // Drag Handlers
+  // Drag Handlers
   const handleSlotMouseDown = (dayIdx: number, hour: number, min: number) => {
-    if (!isSelectionMode) return;
+    // Start new selection or add to existing if cmd/ctrl pressed? 
+    // For GCal style: clicking starts a new selection block.
     setIsDragging(true);
-    // Store as flat comparable value: day * 1440 + hour * 60 + min
     setDragStart({ day: dayIdx, hour, min });
     const { date, time } = getSlotDateTime(dayIdx, hour, min);
     const slotKey = `${date}|${time}`;
-    if (!selectedSlots.includes(slotKey)) {
-      setSelectedSlots([...selectedSlots, slotKey]);
-    }
+    // Clear previous if starting new drag (unless we want additive? GCal is usually new)
+    // Actually GCal creates a new event. We are selecting slots to create a block.
+    // Let's clear previous selection on mouse down to start fresh range.
+    setSelectedSlots([slotKey]);
   };
 
   const handleSlotMouseEnter = (dayIdx: number, hour: number, min: number) => {
-    if (!isSelectionMode || !isDragging || !dragStart) return;
+    if (!isDragging || !dragStart) return;
 
     // Drag-to-paint logic
     const { date, time } = getSlotDateTime(dayIdx, hour, min);
@@ -373,6 +373,9 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
   const handleMouseUp = () => {
     setIsDragging(false);
     setDragStart(null);
+    if (selectedSlots.length > 0) {
+      setShowBlockModal(true);
+    }
   };
 
   const handleRename = async () => {
@@ -517,38 +520,13 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Multi-Select Toggle */}
             <button
-              onClick={() => {
-                setIsSelectionMode(!isSelectionMode);
-                setSelectedSlots([]); // Clear on toggle
-              }}
-              className={`flex items-center gap-2 px-4 py-3 rounded-xl font-black uppercase tracking-widest text-xs transition-all ${isSelectionMode ? 'bg-orange-500 text-white shadow-xl shadow-orange-500/20' : 'bg-white dark:bg-card-dark text-slate-500 border border-slate-200 dark:border-border-dark hover:border-primary hover:text-primary'} `
-              }
+              onClick={() => setShowBlockModal(true)}
+              className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-xl font-black uppercase tracking-widest text-xs shadow-xl shadow-red-600/20 hover:scale-105 transition-all"
             >
-              <span className="material-symbols-outlined text-sm">{isSelectionMode ? 'check_box' : 'check_box_outline_blank'}</span>
-              {isSelectionMode ? 'Multi-Select ON' : 'Multi-Select'}
+              <span className="material-symbols-outlined text-sm">settings</span>
+              Block Settings
             </button>
-
-            {isSelectionMode && selectedSlots.length > 0 && (
-              <button
-                onClick={() => setShowBlockModal(true)} // Open modal to confirm selection
-                className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-xl font-black uppercase tracking-widest text-xs shadow-xl shadow-green-600/20 hover:scale-105 transition-all animate-in fade-in zoom-in duration-200"
-              >
-                <span className="material-symbols-outlined text-sm">save</span>
-                Confirm Block ({selectedSlots.length})
-              </button>
-            )}
-
-            {!isSelectionMode && (
-              <button
-                onClick={() => setShowBlockModal(true)}
-                className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-xl font-black uppercase tracking-widest text-xs shadow-xl shadow-red-600/20 hover:scale-105 transition-all"
-              >
-                <span className="material-symbols-outlined text-sm">settings</span>
-                Block Settings
-              </button>
-            )}
           </div>
         </header >
 
@@ -608,10 +586,13 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
                             let textClass = 'text-slate-500';
                             let borderColor = '';
 
-                            const isSelected = selectedSlots.includes(`${date}| ${time} `);
+                            // Fixed: Remove extra spaces in template literal
+                            const isSelected = selectedSlots.includes(`${date}|${time}`);
                             if (isSelected) {
-                              bgClass = 'bg-orange-500/20';
-                              borderColor = 'border-orange-500 border-2 border-dashed';
+                              bgClass = 'bg-blue-500/30'; // GCal style blue
+                              // borderColor = 'border-blue-500 border-2 border-dashed'; // Remove dashed border for cleaner look? Or keep?
+                              // Let's keep a subtle border
+                              borderColor = 'border-blue-500/50 border';
                             }
 
                             if (isOccupied) {
@@ -636,17 +617,17 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
                               <div
                                 key={min}
                                 onMouseDown={() => {
-                                  if (isSelectionMode) handleSlotMouseDown(dIdx, hour, min);
-                                  else handleBlockSlot(dIdx, hour, min);
+                                  // Always handle slot mouse down for drag start
+                                  handleSlotMouseDown(dIdx, hour, min);
                                 }}
                                 onMouseEnter={() => handleSlotMouseEnter(dIdx, hour, min)}
-                                onClick={() => !isSelectionMode && handleBlockSlot(dIdx, hour, min)}
-                                className={`flex-1 relative group w-full transition-all cursor-pointer overflow-hidden ${bgClass}${borderClass} `}
+
+                                className={`flex-1 relative group w-full transition-all cursor-pointer overflow-hidden ${bgClass} ${borderClass} `}
                                 style={isManualBlock && booking?.color ? { backgroundColor: booking.color } : {}}
                               >
                                 {isOccupied && (
                                   <div
-                                    className={`absolute inset-1 border border-dashed rounded flex flex-col items-center justify-center opacity-90 p-1 ${borderColor}${textClass} `}
+                                    className={`absolute inset-1 border border-dashed rounded flex flex-col items-center justify-center opacity-90 p-1 ${borderColor} ${textClass} `}
                                     title={isManualBlock ? booking.customerName : `${booking.customerName} \n${booking.email} \n${booking.courtType} `}
                                   >
                                     <span className="text-[9px] font-black uppercase tracking-tight text-center leading-none truncate w-full">
@@ -673,117 +654,119 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
         </div>
       </main >
 
-      {showBlockModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/50 backdrop-blur-sm" onClick={() => setShowBlockModal(false)}>
-          <div
-            className="relative bg-white dark:bg-card-dark w-full max-w-[500px] rounded-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
-            onClick={e => e.stopPropagation()}
-          >
-            {/* Header / Title Input */}
-            <div className="flex bg-slate-50 border-b border-border-dark px-4 py-2 justify-end">
-              <button onClick={() => setShowBlockModal(false)} className="text-slate-400 hover:text-slate-700">
-                <span className="material-symbols-outlined text-xl">close</span>
-              </button>
-            </div>
+      {
+        showBlockModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/50 backdrop-blur-sm" onClick={() => setShowBlockModal(false)}>
+            <div
+              className="relative bg-white dark:bg-card-dark w-full max-w-[500px] rounded-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Header / Title Input */}
+              <div className="flex bg-slate-50 border-b border-border-dark px-4 py-2 justify-end">
+                <button onClick={() => setShowBlockModal(false)} className="text-slate-400 hover:text-slate-700">
+                  <span className="material-symbols-outlined text-xl">close</span>
+                </button>
+              </div>
 
-            <div className="p-6 pt-2">
-              <input
-                autoFocus
-                value={blockLabel}
-                onChange={(e) => setBlockLabel(e.target.value)}
-                placeholder="Add title"
-                className="w-full text-2xl font-normal border-b-2 border-slate-200 focus:border-blue-500 outline-none py-2 bg-transparent text-slate-800 dark:text-white placeholder:text-slate-400/80 transition-all font-manrope"
-              />
+              <div className="p-6 pt-2">
+                <input
+                  autoFocus
+                  value={blockLabel}
+                  onChange={(e) => setBlockLabel(e.target.value)}
+                  placeholder="Add title"
+                  className="w-full text-2xl font-normal border-b-2 border-slate-200 focus:border-blue-500 outline-none py-2 bg-transparent text-slate-800 dark:text-white placeholder:text-slate-400/80 transition-all font-manrope"
+                />
 
-              <div className="mt-6 flex flex-col gap-4">
-                {/* Date/Time Row (Simplified Visual) */}
-                <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-300">
-                  <span className="material-symbols-outlined text-slate-400">schedule</span>
-                  <div>
-                    <span className="font-medium mr-2">
-                      {selectedSlots.length > 0
-                        ? new Date(selectedSlots[0].split('|')[0]).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
-                        : 'Select date'}
-                    </span>
-                    <span>• {selectedSlots.length} slots selected</span>
+                <div className="mt-6 flex flex-col gap-4">
+                  {/* Date/Time Row (Simplified Visual) */}
+                  <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-300">
+                    <span className="material-symbols-outlined text-slate-400">schedule</span>
+                    <div>
+                      <span className="font-medium mr-2">
+                        {selectedSlots.length > 0
+                          ? new Date(selectedSlots[0].split('|')[0]).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+                          : 'Select date'}
+                      </span>
+                      <span>• {selectedSlots.length} slots selected</span>
+                    </div>
+                  </div>
+
+                  {/* Recurrence Dropdown */}
+                  <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-300 relative group">
+                    <span className="material-symbols-outlined text-slate-400">repeat</span>
+                    <select
+                      value={recurrence}
+                      onChange={(e) => setRecurrence(e.target.value as any)}
+                      className="appearance-none bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 px-3 py-1.5 rounded cursor-pointer outline-none font-medium pr-8 transition-colors"
+                    >
+                      <option value="Does not repeat">Does not repeat</option>
+                      <option value="Daily">Daily</option>
+                      <option value="Weekly">
+                        Weekly on {selectedSlots.length > 0 ? new Date(selectedSlots[0].split('|')[0] + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long' }) : 'Day'}
+                      </option>
+                      <option value="Monthly">Monthly</option>
+                      <option value="Every weekday (Mon-Fri)">Every weekday (Mon-Fri)</option>
+                      <option value="Infinite">Infinite (3 Years)</option>
+                    </select>
+                    <span className="material-symbols-outlined absolute left-[180px] pointer-events-none text-xs text-slate-500">arrow_drop_down</span>
+                  </div>
+
+                  {/* Court Scope */}
+                  <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-300">
+                    <span className="material-symbols-outlined text-slate-400">location_on</span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setBlockScope('Full Court')}
+                        className={`px-3 py-1.5 rounded text-xs font-bold transition-colors border ${blockScope === 'Full Court' ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'} `}
+                      >
+                        Full Court
+                      </button>
+                      <button
+                        onClick={() => setBlockScope('Half Court')}
+                        className={`px-3 py-1.5 rounded text-xs font-bold transition-colors border ${blockScope === 'Half Court' ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'} `}
+                      >
+                        Half Court
+                      </button>
+                    </div>
                   </div>
                 </div>
 
-                {/* Recurrence Dropdown */}
-                <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-300 relative group">
-                  <span className="material-symbols-outlined text-slate-400">repeat</span>
-                  <select
-                    value={recurrence}
-                    onChange={(e) => setRecurrence(e.target.value as any)}
-                    className="appearance-none bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 px-3 py-1.5 rounded cursor-pointer outline-none font-medium pr-8 transition-colors"
-                  >
-                    <option value="Does not repeat">Does not repeat</option>
-                    <option value="Daily">Daily</option>
-                    <option value="Weekly">
-                      Weekly on {selectedSlots.length > 0 ? new Date(selectedSlots[0].split('|')[0] + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long' }) : 'Day'}
-                    </option>
-                    <option value="Monthly">Monthly</option>
-                    <option value="Every weekday (Mon-Fri)">Every weekday (Mon-Fri)</option>
-                    <option value="Infinite">Infinite (3 Years)</option>
-                  </select>
-                  <span className="material-symbols-outlined absolute left-[180px] pointer-events-none text-xs text-slate-500">arrow_drop_down</span>
-                </div>
-
-                {/* Court Scope */}
-                <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-300">
-                  <span className="material-symbols-outlined text-slate-400">location_on</span>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setBlockScope('Full Court')}
-                      className={`px-3 py-1.5 rounded text-xs font-bold transition-colors border ${blockScope === 'Full Court' ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'} `}
-                    >
-                      Full Court
-                    </button>
-                    <button
-                      onClick={() => setBlockScope('Half Court')}
-                      className={`px-3 py-1.5 rounded text-xs font-bold transition-colors border ${blockScope === 'Half Court' ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'} `}
-                    >
-                      Half Court
-                    </button>
+                {/* Color Picker (Create Modal) */}
+                <div className="mt-6">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Block Color</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {COLORS.map((c) => (
+                      <button
+                        key={c.value}
+                        title={c.label}
+                        onClick={() => setSelectedColor(c.value)}
+                        className={`size-8 rounded-full transition-transform hover: scale-110 ${selectedColor === c.value ? 'ring-2 ring-offset-2 ring-primary scale-110' : ''} `}
+                        style={{ backgroundColor: c.value }}
+                      />
+                    ))}
                   </div>
                 </div>
+
               </div>
 
-              {/* Color Picker (Create Modal) */}
-              <div className="mt-6">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Block Color</label>
-                <div className="flex gap-2 flex-wrap">
-                  {COLORS.map((c) => (
-                    <button
-                      key={c.value}
-                      title={c.label}
-                      onClick={() => setSelectedColor(c.value)}
-                      className={`size-8 rounded-full transition-transform hover: scale-110 ${selectedColor === c.value ? 'ring-2 ring-offset-2 ring-primary scale-110' : ''} `}
-                      style={{ backgroundColor: c.value }}
-                    />
-                  ))}
-                </div>
+              <div className="px-6 py-4 flex justify-end gap-3 border-t border-slate-100 dark:border-border-dark mt-4">
+                <button
+                  onClick={() => setShowBlockModal(false)}
+                  className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-md transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmSelection}
+                  className="px-6 py-2 text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow-lg shadow-blue-500/20 transition-all"
+                >
+                  Save
+                </button>
               </div>
-
-            </div>
-
-            <div className="px-6 py-4 flex justify-end gap-3 border-t border-slate-100 dark:border-border-dark mt-4">
-              <button
-                onClick={() => setShowBlockModal(false)}
-                className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-md transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmSelection}
-                className="px-6 py-2 text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow-lg shadow-blue-500/20 transition-all"
-              >
-                Save
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {
         editingBlock && (
@@ -932,7 +915,8 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
               </div>
             </div>
           </div>
-        )}
+        )
+      }
     </div >
   );
 };

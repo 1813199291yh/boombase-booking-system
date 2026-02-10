@@ -47,7 +47,7 @@ export const api = {
             const params = new URLSearchParams({ start, end });
             url += `?${params.toString()}`;
         }
-        const response = await fetch(url);
+        const response = await fetch(url, { cache: 'no-store' });
         if (!response.ok) throw new Error('Failed to fetch bookings');
         return response.json();
     },

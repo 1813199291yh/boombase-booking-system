@@ -27,7 +27,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onBookNow, onAdminClick }) =>
       for (let min of ["00", "30"]) {
         let displayHour = hour > 12 ? hour - 12 : hour;
         let period = hour >= 12 ? "PM" : "AM";
-        slots.push(`${displayHour.toString().padStart(2, '0')}:${min} ${period}`);
+        slots.push(`${displayHour}:${min} ${period}`);
       }
     }
     slots.push("10:00 PM"); // Final end point
@@ -36,13 +36,18 @@ const LandingPage: React.FC<LandingPageProps> = ({ onBookNow, onAdminClick }) =>
 
   const timeSlots = generateTimeSlots();
 
+  // Helper to normalize time strings (remove leading zeros)
+  // e.g. "09:00 AM" -> "9:00 AM"
+  const normalizeTime = (t: string) => t.replace(/^0/, '');
+
   // Load bookings and calculate blocked slots
   useEffect(() => {
     if (!selectedDate || !selectedCourt) return;
 
     const fetchAvailability = async () => {
       try {
-        const bookings = await api.getBookings();
+        // Fetch only selected date to ensure fresh data and reduce payload
+        const bookings = await api.getBookings(selectedDate, selectedDate);
         const blocked = new Set<string>();
 
         bookings.forEach((b: any) => {
@@ -65,8 +70,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onBookNow, onAdminClick }) =>
             // Parse Time Range
             if (b.time.includes('-')) {
               const [start, end] = b.time.split(' - ');
-              const startIdx = timeSlots.indexOf(start);
-              const endIdx = timeSlots.indexOf(end);
+              // Normalize start/end before lookup
+              const startIdx = timeSlots.indexOf(normalizeTime(start));
+              const endIdx = timeSlots.indexOf(normalizeTime(end));
 
               if (startIdx !== -1 && endIdx !== -1) {
                 for (let i = startIdx; i < endIdx; i++) {
@@ -75,7 +81,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onBookNow, onAdminClick }) =>
               }
             } else {
               // Single slot block (Admin Manual Block)
-              blocked.add(b.time);
+              // Normalize before adding to set (which matches timeSlots format)
+              blocked.add(normalizeTime(b.time));
             }
           }
         });

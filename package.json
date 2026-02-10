@@ -9,8 +9,8 @@
     "build:server": "tsc -p tsconfig.server.json",
     "start": "node dist/server/index.js",
     "preview": "vite preview",
-    "server": "ts-node -r dotenv/config server/index.ts",
-    "dev:server": "nodemon --watch server --exec ts-node -r dotenv/config server/index.ts"
+    "server": "npx tsx -r dotenv/config server/index.ts",
+    "dev:server": "nodemon --watch server --exec \"npx tsx -r dotenv/config server/index.ts\""
   },
   "dependencies": {
     "@stripe/react-stripe-js": "^5.6.0",
