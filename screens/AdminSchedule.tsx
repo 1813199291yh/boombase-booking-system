@@ -534,10 +534,10 @@ const AdminSchedule: React.FC<AdminScheduleProps> = ({ onNavigateToDashboard, on
           <div className="min-w-[1200px] bg-white dark:bg-card-dark rounded-3xl border border-border-dark shadow-2xl overflow-hidden">
             <div className="px-8 py-4 border-b border-border-dark flex gap-8 items-center bg-slate-50/50 dark:bg-card-dark/50 backdrop-blur-sm">
               <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                <div className="size-3 rounded-sm bg-primary"></div> Full Court
+                <div className="size-3 rounded-sm bg-green-500/20 border border-green-500/50"></div> Confirmed
               </div>
               <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                <div className="size-3 rounded-sm bg-blue-500"></div> Half Court
+                <div className="size-3 rounded-sm bg-orange-500/20 border border-orange-500/50"></div> Pending
               </div>
               <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
                 <div className="size-3 rounded-sm bg-slate-200 dark:bg-slate-800 border-2 border-dashed border-slate-400/50"></div> Blocked

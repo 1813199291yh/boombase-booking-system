@@ -100,3 +100,27 @@ export const sendClientCancellation = async (booking: any) => {
         console.error('Error sending client cancellation email:', error);
     }
 };
+
+export const sendClientRequestReceived = async (booking: any) => {
+    const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: booking.email,
+        subject: `Booking Request Received - Boombase`,
+        html: `
+      <h2>Booking Request Received 🏀</h2>
+      <p>Hi ${booking.customer_name},</p>
+      <p>We have received your booking request for <strong>${booking.court_type}</strong> on <strong>${booking.date} at ${booking.time}</strong>.</p>
+      <p>Status: <strong>Pending Approval</strong></p>
+      <br/>
+      <p>We will notify you once your booking is confirmed.</p>
+      <p>Best,<br/>The Boombase Team</p>
+    `,
+    };
+
+    try {
+        await getTransporter().sendMail(mailOptions);
+        console.log('Client request received email sent');
+    } catch (error) {
+        console.error('Error sending client request email:', error);
+    }
+};

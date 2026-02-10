@@ -2,7 +2,7 @@
 import { Router } from 'express';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
-import { sendAdminNotification, sendClientConfirmation, sendClientCancellation } from './email.js';
+import { sendAdminNotification, sendClientConfirmation, sendClientCancellation, sendClientRequestReceived } from './email.js';
 
 export const router = Router();
 
@@ -87,8 +87,16 @@ router.post('/bookings', async (req, res) => {
         }
 
         // Send Email to Admin (only if it's a real customer booking, i.e. price > 0 or not blocked)
-        if (price > 0) {
+        console.log(`[Create Booking] Price: ${price} (Type: ${typeof price})`);
+
+        if (Number(price) > 0) {
+            console.log('[Create Booking] Sending Admin Notification...');
             await sendAdminNotification(data);
+
+            console.log('[Create Booking] Sending Client Request Receipt...');
+            await sendClientRequestReceived(data);
+        } else {
+            console.log('[Create Booking] Price is 0, skipping emails');
         }
 
         res.json({ clientSecret, booking: data });
