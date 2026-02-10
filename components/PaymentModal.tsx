@@ -50,11 +50,11 @@ const CheckoutForm: React.FC<{ onSuccess: (booking: Booking) => void, bookingDat
                 setProcessing(false);
             } else if (paymentIntent && paymentIntent.status === 'succeeded') {
                 // 3. Success!
-                // Update status to Confirmed manually (since no webhooks in this demo)
+                // Payment succeeded, but we keep status as 'Pending Approval' for Admin Review.
+                // We do NOT auto-confirm.
                 if (tempBooking?.id) {
-                    await api.updateBookingStatus(tempBooking.id, 'Confirmed');
-                    // Pass the updated booking info back
-                    onSuccess({ ...tempBooking, status: 'Confirmed' });
+                    // Just proceed
+                    onSuccess({ ...tempBooking, status: 'Pending Approval' });
                 } else {
                     // Fallback
                     onSuccess(bookingData as Booking);
