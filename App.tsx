@@ -100,7 +100,11 @@ const App: React.FC = () => {
   };
 
   const handlePayment = (details: { name: string, email: string }) => {
-    setCurrentBookingDraft({ ...currentBookingDraft, ...details });
+    setCurrentBookingDraft({
+      ...currentBookingDraft,
+      customerName: details.name,
+      email: details.email
+    });
     navigateTo(ScreenType.WAIVER);
   };
 

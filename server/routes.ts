@@ -38,6 +38,7 @@ router.post('/login', (req, res) => {
 // Create a booking & Payment Intent
 router.post('/bookings', async (req, res) => {
     try {
+        console.log('[POST /bookings] Received body:', JSON.stringify(req.body, null, 2));
         const { customerName, email, courtType, date, time, price, waiverName, waiverSignature, status, recurringGroupId, color } = req.body;
 
         let stripePaymentId = 'manual-block';
@@ -86,18 +87,7 @@ router.post('/bookings', async (req, res) => {
             return res.status(500).json({ error: error.message });
         }
 
-        // Send Email to Admin (only if it's a real customer booking, i.e. price > 0 or not blocked)
-        console.log(`[Create Booking] Price: ${price} (Type: ${typeof price})`);
-
-        if (Number(price) > 0) {
-            console.log('[Create Booking] Sending Admin Notification...');
-            await sendAdminNotification(data);
-
-            console.log('[Create Booking] Sending Client Request Receipt...');
-            await sendClientRequestReceived(data);
-        } else {
-            console.log('[Create Booking] Price is 0, skipping emails');
-        }
+        // Email sending moved to Stripe Webhook to ensure payment is finalized first
 
         res.json({ clientSecret, booking: data });
     } catch (error: any) {
@@ -171,36 +161,53 @@ router.get('/bookings', async (req, res) => {
     try {
         const { start, end } = req.query;
 
-        let query = supabase.from('bookings').select('*');
+        let allBookings: any[] = [];
+        let offset = 0;
+        const limit = 1000;
+        let fetchMore = true;
 
-        if (start) {
-            query = query.gte('date', start);
+        console.log(`[API] Fetching bookings (start: ${start}, end: ${end}) with pagination...`);
+
+        while (fetchMore) {
+            let query = supabase.from('bookings').select('*');
+
+            if (start) {
+                query = query.gte('date', start);
+            }
+            if (end) {
+                query = query.lte('date', end);
+            }
+
+            // Ensure consistent ordering so pagination doesn't skip/duplicate rows
+            query = query.order('created_at', { ascending: false }).order('id', { ascending: true });
+
+            // Fetch the current page
+            query = query.range(offset, offset + limit - 1);
+
+            const { data, error } = await query;
+
+            if (error) {
+                console.error(`[API] Supabase Fetch Error at offset ${offset}:`, error);
+                throw error;
+            }
+
+            if (data && data.length > 0) {
+                allBookings = allBookings.concat(data);
+                offset += limit;
+
+                // If we got exactly the limit, there might be more pages
+                if (data.length < limit) {
+                    fetchMore = false;
+                }
+            } else {
+                fetchMore = false;
+            }
         }
-        if (end) {
-            query = query.lte('date', end);
-        }
 
-        // Explicitly sort by created_at DESC to ensure new bookings appear even if limit is hit
-        query = query.order('created_at', { ascending: false });
-
-        // Increase default limit (Supabase default is 1000)
-        // Use range() to be explicit
-        query = query.range(0, 9999);
-
-        // Sort by date DESC so we see newest if limit is hit?
-        // Actually, for schedule we want ascending? Or just date.
-        // If we want new bookings to appear even if past ones fill limit, we should filter past out?
-        // But for now, sheer volume:
-        console.log(`[API] Fetching bookings (start: ${start}, end: ${end}) with limit 10000`);
-
-        const { data, error } = await query;
-
-        if (error) throw error;
-
-        console.log(`[API] Returned ${data?.length} bookings`);
+        console.log(`[API] Returned ${allBookings.length} total bookings across all pages.`);
 
         // Map to frontend structure
-        const bookings = data.map(mapBooking);
+        const bookings = allBookings.map(mapBooking);
         res.json(bookings);
     } catch (error: any) {
         res.status(500).json({ error: error.message });

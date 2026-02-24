@@ -3,8 +3,9 @@ import nodemailer from 'nodemailer';
 const getTransporter = () => {
     // Lazy load the transporter to ensure process.env is populated
     if (!(global as any).emailTransporter) {
+        console.log(`[Email] Initializing Transporter with User: ${process.env.EMAIL_USER}`);
         (global as any).emailTransporter = nodemailer.createTransport({
-            service: 'gmail', // Easy setup for Gmail. Change host/port if using another provider.
+            service: 'gmail',
             auth: {
                 user: process.env.EMAIL_USER,
                 pass: process.env.EMAIL_PASS,
@@ -20,8 +21,9 @@ export const sendAdminNotification = async (booking: any) => {
     const adminEmail = process.env.ADMIN_EMAIL || 'damon@theboombase.com';
 
     const mailOptions = {
-        from: process.env.EMAIL_USER,
+        from: `"Boombase" <${process.env.EMAIL_USER}>`,
         to: adminEmail,
+        replyTo: booking.email,
         subject: `New Booking Request: ${booking.customer_name}`,
         html: `
       <h2>New Booking Request Received</h2>
@@ -48,7 +50,7 @@ export const sendAdminNotification = async (booking: any) => {
 
 export const sendClientConfirmation = async (booking: any) => {
     const mailOptions = {
-        from: process.env.EMAIL_USER,
+        from: `"Boombase" <${process.env.EMAIL_USER}>`,
         to: booking.email,
         subject: `Booking Confirmed! - Boombase`,
         html: `
@@ -79,7 +81,7 @@ export const sendClientConfirmation = async (booking: any) => {
 
 export const sendClientCancellation = async (booking: any) => {
     const mailOptions = {
-        from: process.env.EMAIL_USER,
+        from: `"Boombase" <${process.env.EMAIL_USER}>`,
         to: booking.email,
         subject: `Booking Update - Boombase`,
         html: `
@@ -103,7 +105,7 @@ export const sendClientCancellation = async (booking: any) => {
 
 export const sendClientRequestReceived = async (booking: any) => {
     const mailOptions = {
-        from: process.env.EMAIL_USER,
+        from: `"Boombase" <${process.env.EMAIL_USER}>`,
         to: booking.email,
         subject: `Booking Request Received - Boombase`,
         html: `

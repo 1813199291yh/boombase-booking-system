@@ -6,7 +6,7 @@ import { router } from './routes.js';
 
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
-import { sendAdminNotification } from './email.js';
+import { sendAdminNotification, sendClientRequestReceived } from './email.js';
 
 dotenv.config();
 
@@ -23,6 +23,12 @@ const supabase = createClient(
 );
 
 app.use(cors());
+
+// Log every request
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    next();
+});
 
 // Stripe Webhook Route (MUST be before express.json)
 app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
@@ -55,9 +61,10 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
                 .single();
 
             if (booking) {
-                // Optionally send admin email here if you prefer to wait for payment
-                // await sendAdminNotification(booking);
-                console.log('Booking confirmed as paid:', booking.id);
+                console.log('Booking confirmed as paid, sending out notifications:', booking.id);
+                // Trigger real customer notifications
+                await sendAdminNotification(booking);
+                await sendClientRequestReceived(booking);
             }
             break;
         default:
